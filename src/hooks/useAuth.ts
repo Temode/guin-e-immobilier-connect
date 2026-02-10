@@ -94,7 +94,9 @@ export function useAuth() {
       email,
       password,
     });
-    if (data.session) {
+    if (data.session && data.user) {
+      const profile = await fetchProfile(data.user.id);
+      setState({ user: data.user, session: data.session, loading: false, profile });
       navigate('/dashboard-locataire');
     }
     return { data, error };
