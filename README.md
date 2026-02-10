@@ -1,73 +1,94 @@
-# Welcome to your Lovable project
+# ImmoGuinée - Plateforme Immobilière en Guinée
 
-## Project info
+ImmoGuinée est une plateforme immobilière moderne conçue spécifiquement pour le marché guinéen. Elle vise à connecter les propriétaires, les locataires et les agents immobiliers de manière sécurisée et transparente.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Fonctionnalités
 
-## How can I edit this code?
+- **Vérification KYC** : Tous les utilisateurs sont vérifiés via une identification biométrique
+- **Paiements automatisés** : Prélèvements automatiques des loyers
+- **Tableaux de bord clairs** : Suivi en temps réel des revenus, locataires et paiements
+- **Contrats automatiques** : Génération de contrats de bail avec signature électronique
+- **Gestion diaspora** : Service de gestion de biens pour les propriétaires vivant à l'étranger
+- **Messagerie intégrée** : Communication directe entre les parties
 
-There are several ways of editing your application.
+## Technologies utilisées
 
-**Use Lovable**
+- React (v19.2.0)
+- TypeScript
+- Vite
+- React Router DOM
+- Lucide React (pour les icônes)
+- CSS Modules
+- Jest et React Testing Library (pour les tests)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Architecture du projet
 
-Changes made via Lovable will be committed automatically to this repo.
+```
+src/
+├── App.tsx                 # Point d'entrée principal de l'application
+├── context/                # Gestion d'état avec Context API
+│   └── PropertyContext.tsx # Contexte pour les données dynamiques
+├── components/
+│   ├── pages/             # Pages principales
+│   │   ├── Home.tsx       # Page d'accueil
+│   │   ├── AuthPage.tsx   # Pages d'authentification
+│   │   └── ...
+│   └── dashboard_locataire/ # Composants du tableau de bord locataire
+│       ├── Dashboard_Locataire.tsx
+│       ├── Mon_Logement.tsx
+│       ├── Mes_Paiements.tsx
+│       └── ...
+├── assets/                # Images et autres ressources
+└── ...
+```
 
-**Use your preferred IDE**
+## Installation
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+1. Clonez le dépôt :
+```bash
+git clone https://github.com/votre-compte/immo-guinee.git
+cd imo-guinee
+```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+2. Installez les dépendances :
+```bash
+npm install
+```
 
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+3. Démarrez le serveur de développement :
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+L'application sera accessible à l'adresse http://localhost:5173
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Scripts disponibles
 
-**Use GitHub Codespaces**
+- `npm run dev` - Démarre le serveur de développement
+- `npm run build` - Crée une version optimisée pour la production
+- `npm run preview` - Prévisualise la version de production localement
+- `npm run lint` - Exécute ESLint pour vérifier le code
+- `npm run test` - Lance les tests avec Jest
+- `npm run test:watch` - Lance les tests en mode surveillance
+- `npm run test:coverage` - Génère un rapport de couverture de test
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Tests
 
-## What technologies are used for this project?
+Le projet utilise Jest et React Testing Library pour les tests. Les fichiers de test se trouvent à côté des composants qu'ils testent.
 
-This project is built with:
+Pour exécuter les tests :
+```bash
+npm run test
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Structure de gestion d'état
 
-## How can I deploy this project?
+Le projet utilise React Context API pour gérer l'état global des données dynamiques comme les propriétés immobilières, les fonctionnalités, les points de confiance, etc.
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## Contribution
 
-## Can I connect a custom domain to my Lovable project?
+Les contributions sont les bienvenues ! Veuillez d'abord discuter des modifications que vous souhaitez apporter via les issues, puis soumettre une Pull Request.
 
-Yes, you can!
+## Licence
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Ce projet est sous licence MIT.

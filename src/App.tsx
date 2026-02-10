@@ -1,27 +1,42 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-
-const queryClient = new QueryClient();
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { PropertyProvider } from './context/PropertyContext';
+import SocialAuthPage from "./components/pages/SocialAuthPage";
+import EmailAuthPage from "./components/pages/EmailAuthPage";
+import UserRoleSelection from "./components/pages/UserRoleSelection";
+import Home from "./components/pages/Home";
+import DashboardLocataireLayout from './components/dashboard_locataire/shared/DashboardLocataireLayout';
+import Dashboard_Locataire from './components/dashboard_locataire/Dashboard_Locataire';
+import Mon_Logement from './components/dashboard_locataire/Mon_Logement';
+import Mes_Paiements from './components/dashboard_locataire/Mes_Paiements';
+import Documents from './components/dashboard_locataire/Documents';
+import Messages from './components/dashboard_locataire/Messages';
+import Notifications from './components/dashboard_locataire/Notifications';
+import SearchProperty from './components/dashboard_locataire/SearchProperty';
+import ProfileSettings from './components/dashboard_locataire/ProfileSettings';
+export default function App() {
+  return (
+    <PropertyProvider>
+      <Router>
         <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+          <Route path="/" element={<Home />} />
+          <Route path="/auth" element={<SocialAuthPage />} />
+          <Route path="/auth/email" element={<EmailAuthPage />} />
+          <Route path="/user-role" element={<UserRoleSelection />} />
 
-export default App;
+          <Route path="/dashboard-locataire" element={<DashboardLocataireLayout />}>
+            <Route index element={<Dashboard_Locataire />} />
+            <Route path="mon-logement" element={<Mon_Logement />} />
+            <Route path="mes-paiements" element={<Mes_Paiements />} />
+            <Route path="documents" element={<Documents />} />
+            <Route path="messages" element={<Messages />} />
+            <Route path="notifications" element={<Notifications />} />
+            <Route path="recherche" element={<SearchProperty />} />
+            <Route path="profil" element={<ProfileSettings />} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Router>
+    </PropertyProvider>
+  );
+}
