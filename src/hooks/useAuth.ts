@@ -83,6 +83,9 @@ export function useAuth() {
         },
       },
     });
+    if (data.session) {
+      navigate('/dashboard-locataire');
+    }
     return { data, error };
   };
 
