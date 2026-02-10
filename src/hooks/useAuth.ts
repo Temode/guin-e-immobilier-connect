@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { lovable } from '@/integrations/lovable/index';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthState {
@@ -103,17 +102,13 @@ export function useAuth() {
   };
 
   const signInWithGoogle = async () => {
-    const result = await lovable.auth.signInWithOAuth('google', {
-      redirect_uri: window.location.origin,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard-locataire`,
+      },
     });
-    if (result.error) {
-      return { error: result.error };
-    }
-    // If not redirected (tokens received), navigate
-    if (!result.redirected && result.tokens) {
-      navigate('/dashboard-locataire');
-    }
-    return { error: null };
+    return { error };
   };
 
   const signOut = async () => {
