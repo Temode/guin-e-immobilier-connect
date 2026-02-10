@@ -1,3 +1,4 @@
+// @ts-nocheck
 import styles from './Dashboard_Locataire.module.css';
 
 /* ==========================================

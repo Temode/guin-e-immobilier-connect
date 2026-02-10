@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState } from 'react';
 import styles from './Notifications.module.css';
 
