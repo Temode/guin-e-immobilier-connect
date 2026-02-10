@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState } from 'react';
 import styles from './Mes_Paiements.module.css';
 

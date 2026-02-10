@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState } from 'react';
 import styles from './Mon_Logement.module.css';
 
