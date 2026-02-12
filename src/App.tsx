@@ -15,8 +15,9 @@ import Messages from './components/dashboard_locataire/Messages';
 import Notifications from './components/dashboard_locataire/Notifications';
 import SearchProperty from './components/dashboard_locataire/SearchProperty';
 import ProfileSettings from './components/dashboard_locataire/ProfileSettings';
-import AgentDashboard from './components/dashbord_demarcheur/AgentDashboard';
-import AgentMesBiens from './components/dashbord_demarcheur/AgentMesBiens';
+import DashboardAgentLayout from './components/dashbord_demarcheur/shared/DashboardAgentLayout';
+import AgentDashboard from './components/dashbord_demarcheur/Agentdashboard';
+import AgentMesBiens from './components/dashbord_demarcheur/Agentmesbiens';
 import AgentAgenda from './components/dashbord_demarcheur/Agentagenda';
 
 export default function App() {
@@ -30,9 +31,11 @@ export default function App() {
             <Route path="/auth/email" element={<EmailAuthPage />} />
             <Route path="/user-role" element={<UserRoleSelection />} />
             
-            <Route path="/dashbord-agent" element={<AgentDashboard />} />
-            <Route path="/agent-mes-biens" element={<AgentMesBiens />} />
-            <Route path="/agent-agenda" element={<AgentAgenda />} />
+            <Route path="/dashbord-agent" element={<DashboardAgentLayout />}>
+              <Route index element={<AgentDashboard />} />
+              <Route path="mes-biens" element={<AgentMesBiens />} />
+              <Route path="agenda" element={<AgentAgenda />} />
+            </Route>
 
             <Route path="/dashboard-locataire" element={
               <ProtectedRoute>
