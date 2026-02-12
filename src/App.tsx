@@ -19,6 +19,10 @@ import DashboardAgentLayout from './components/dashbord_demarcheur/shared/Dashbo
 import AgentDashboard from './components/dashbord_demarcheur/Agentdashboard';
 import AgentMesBiens from './components/dashbord_demarcheur/Agentmesbiens';
 import AgentAgenda from './components/dashbord_demarcheur/Agentagenda';
+import AgentClients from './components/dashbord_demarcheur/Agentclients';
+import AgentMessages from './components/dashbord_demarcheur/Agentmessages';
+import AgentCommissions from './components/dashbord_demarcheur/Agentcommissions';
+import AgentSettings from './components/dashbord_demarcheur/Agentsettings';
 
 export default function App() {
   return (
@@ -34,7 +38,11 @@ export default function App() {
             <Route path="/dashbord-agent" element={<DashboardAgentLayout />}>
               <Route index element={<AgentDashboard />} />
               <Route path="mes-biens" element={<AgentMesBiens />} />
+              <Route path="mes-clients" element={<AgentClients />} />
               <Route path="agenda" element={<AgentAgenda />} />
+              <Route path="messages" element={<AgentMessages />} />
+              <Route path="commissions" element={<AgentCommissions />} />
+              <Route path="profil" element={<AgentSettings />} />
             </Route>
 
             <Route path="/dashboard-locataire" element={

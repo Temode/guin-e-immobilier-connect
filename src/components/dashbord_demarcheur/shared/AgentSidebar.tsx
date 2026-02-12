@@ -7,8 +7,7 @@ import {
   CalendarIcon,
   CurrencyIcon,
   MessageIcon,
-  NotificationIcon,
-  UserIcon,
+  SettingsIcon,
   StarIcon,
   SparklesIcon,
 } from './AgentSidebarIcons';
@@ -26,7 +25,7 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   to: string;
-  badge?: number;
+  badge?: number | string;
   badgeUrgent?: boolean;
   badgeGold?: boolean;
 }
@@ -42,27 +41,26 @@ const navSections: NavSection[] = [
     items: [
       { icon: DashboardIcon, label: 'Tableau de bord', to: '/dashbord-agent' },
       { icon: BuildingIcon, label: 'Mes biens', to: '/dashbord-agent/mes-biens', badge: 12, badgeGold: true },
-      { icon: UsersIcon, label: 'Mes clients', to: '/dashbord-agent/mes-clients', badge: 5, badgeUrgent: true },
+      { icon: UsersIcon, label: 'Mes clients', to: '/dashbord-agent/mes-clients', badge: 47 },
       { icon: CalendarIcon, label: 'Agenda & Visites', to: '/dashbord-agent/agenda', badge: 3 },
-    ],
-  },
-  {
-    title: 'Finances',
-    items: [
-      { icon: CurrencyIcon, label: 'Commissions', to: '/dashbord-agent/commissions' },
     ],
   },
   {
     title: 'Communication',
     items: [
       { icon: MessageIcon, label: 'Messages', to: '/dashbord-agent/messages', badge: 8, badgeUrgent: true },
-      { icon: NotificationIcon, label: 'Notifications', to: '/dashbord-agent/notifications' },
+    ],
+  },
+  {
+    title: 'Finances',
+    items: [
+      { icon: CurrencyIcon, label: 'Mes commissions', to: '/dashbord-agent/commissions', badge: '+850K', badgeGold: true },
     ],
   },
   {
     title: 'Compte',
     items: [
-      { icon: UserIcon, label: 'Profil & Paramètres', to: '/dashbord-agent/profil' },
+      { icon: SettingsIcon, label: 'Paramètres & Profil', to: '/dashbord-agent/profil' },
     ],
   },
 ];
@@ -142,9 +140,9 @@ const AgentSidebar = ({ agent }: { agent: AgentInfo }) => {
           <div className={styles.premiumCardIcon}>
             <SparklesIcon />
           </div>
-          <h4>Passez Premium</h4>
-          <p>Boostez vos annonces et gagnez plus</p>
-          <button className={`${styles.btn} ${styles.btnGold}`}>Découvrir l'offre</button>
+          <h4>Passez Pro</h4>
+          <p>Commission réduite à 3-4%</p>
+          <button className={`${styles.btn} ${styles.btnGold}`}>Voir les avantages</button>
         </div>
       </div>
     </aside>
