@@ -16,6 +16,11 @@ interface AuthState {
   } | null;
 }
 
+function getDashboardByRole(role?: string): string {
+  if (role === 'agent' || role === 'owner') return '/dashbord-agent';
+  return '/dashboard-locataire';
+}
+
 export function useAuth() {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -83,7 +88,7 @@ export function useAuth() {
       },
     });
     if (data.session) {
-      navigate('/dashboard-locataire');
+      navigate('/user-role');
     }
     return { data, error };
   };
@@ -96,7 +101,8 @@ export function useAuth() {
     if (data.session && data.user) {
       const profile = await fetchProfile(data.user.id);
       setState({ user: data.user, session: data.session, loading: false, profile });
-      navigate('/dashboard-locataire');
+      const role = data.user.user_metadata?.role;
+      navigate(role ? getDashboardByRole(role) : '/user-role');
     }
     return { data, error };
   };
@@ -105,9 +111,25 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/dashboard-locataire`,
+        redirectTo: `${window.location.origin}/user-role`,
       },
     });
+    return { error };
+  };
+
+  const updateUserRole = async (role: string) => {
+    const { error } = await supabase.auth.updateUser({
+      data: { role },
+    });
+    if (!error && state.user) {
+      setState((prev) => ({
+        ...prev,
+        user: {
+          ...prev.user!,
+          user_metadata: { ...prev.user!.user_metadata, role },
+        },
+      }));
+    }
     return { error };
   };
 
@@ -125,5 +147,7 @@ export function useAuth() {
     signInWithEmail,
     signInWithGoogle,
     signOut,
+    updateUserRole,
+    getDashboardByRole,
   };
 }

@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { Search, Home, Key, Briefcase } from 'lucide-react';
+import { useAuthContext } from '@/context/AuthContext';
 import styles from './UserRoleSelection.module.css';
 
 const UserRoleSelection: React.FC = () => {
-  const [selectedRole, setSelectedRole] = useState<string>('looking'); // Valeur par défaut: je cherche une maison
+  const { user, loading, updateUserRole, getDashboardByRole } = useAuthContext();
+  const navigate = useNavigate();
+  const [selectedRole, setSelectedRole] = useState<string>('looking');
+  const [submitting, setSubmitting] = useState(false);
 
   const roles = [
     { id: 'looking', title: 'Je cherche une maison', description: 'Trouver un logement à louer ou acheter', icon: Search },
@@ -13,20 +17,38 @@ const UserRoleSelection: React.FC = () => {
     { id: 'agent', title: 'Agent immobilier', description: 'Gérer les biens pour les clients', icon: Briefcase }
   ];
 
-  const handleRoleChange = (roleId: string) => {
-    setSelectedRole(roleId);
-  };
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <p>Chargement...</p>
+      </div>
+    );
+  }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  // If user already has a role, redirect to the correct dashboard
+  const existingRole = user.user_metadata?.role;
+  if (existingRole) {
+    return <Navigate to={getDashboardByRole(existingRole)} replace />;
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRole) {
-      alert('Veuillez sélectionner une option');
+    if (!selectedRole || submitting) return;
+
+    setSubmitting(true);
+    const { error } = await updateUserRole(selectedRole);
+
+    if (error) {
+      alert('Erreur lors de la sauvegarde du rôle. Veuillez réessayer.');
+      setSubmitting(false);
       return;
     }
 
-    console.log('Rôle sélectionné:', selectedRole);
-    // Ici, vous pouvez enregistrer le rôle de l'utilisateur dans votre système
-    // et rediriger vers la page appropriée
+    navigate(getDashboardByRole(selectedRole));
   };
 
   return (
@@ -73,8 +95,8 @@ const UserRoleSelection: React.FC = () => {
             </div>
 
             <div className={styles.buttonContainer}>
-              <button type="submit" className={styles.continueButton} disabled={!selectedRole}>
-                Continuer
+              <button type="submit" className={styles.continueButton} disabled={!selectedRole || submitting}>
+                {submitting ? 'En cours...' : 'Continuer'}
               </button>
             </div>
           </form>
@@ -82,6 +104,10 @@ const UserRoleSelection: React.FC = () => {
       </div>
     </div>
   );
+
+  function handleRoleChange(roleId: string) {
+    setSelectedRole(roleId);
+  }
 };
 
 export default UserRoleSelection;

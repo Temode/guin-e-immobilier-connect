@@ -35,7 +35,11 @@ export default function App() {
             <Route path="/auth/email" element={<EmailAuthPage />} />
             <Route path="/user-role" element={<UserRoleSelection />} />
             
-            <Route path="/dashbord-agent" element={<DashboardAgentLayout />}>
+            <Route path="/dashbord-agent" element={
+              <ProtectedRoute>
+                <DashboardAgentLayout />
+              </ProtectedRoute>
+            }>
               <Route index element={<AgentDashboard />} />
               <Route path="mes-biens" element={<AgentMesBiens />} />
               <Route path="mes-clients" element={<AgentClients />} />
