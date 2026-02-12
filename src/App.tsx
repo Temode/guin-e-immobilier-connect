@@ -15,6 +15,9 @@ import Messages from './components/dashboard_locataire/Messages';
 import Notifications from './components/dashboard_locataire/Notifications';
 import SearchProperty from './components/dashboard_locataire/SearchProperty';
 import ProfileSettings from './components/dashboard_locataire/ProfileSettings';
+import AgentDashboard from './components/dashbord_demarcheur/AgentDashboard';
+import AgentMesBiens from './components/dashbord_demarcheur/AgentMesBiens';
+import AgentAgenda from './components/dashbord_demarcheur/Agentagenda';
 
 export default function App() {
   return (
@@ -26,6 +29,10 @@ export default function App() {
             <Route path="/auth" element={<SocialAuthPage />} />
             <Route path="/auth/email" element={<EmailAuthPage />} />
             <Route path="/user-role" element={<UserRoleSelection />} />
+            
+            <Route path="/dashbord-agent" element={<AgentDashboard />} />
+            <Route path="/agent-mes-biens" element={<AgentMesBiens />} />
+            <Route path="/agent-agenda" element={<AgentAgenda />} />
 
             <Route path="/dashboard-locataire" element={
               <ProtectedRoute>
