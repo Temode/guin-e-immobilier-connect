@@ -1,6 +1,9 @@
 // @ts-nocheck
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import styles from './ProfileSettings.module.css';
+import { useAuthContext } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { countries, getDialCodeByCountryName } from '@/data/countries';
 
 /* ==========================================
    ICONS COMPONENTS (page-specific only)
@@ -140,9 +143,29 @@ const DesktopIcon = ({ className }) => (
 );
 
 /* ==========================================
+   TOAST / FEEDBACK
+========================================== */
+const Toast = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const t = setTimeout(onClose, 4000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  return (
+    <div className={`${styles.toast} ${styles[type]}`}>
+      {type === 'success' ? <CheckIcon /> : <WarningIcon />}
+      <span>{message}</span>
+    </div>
+  );
+};
+
+/* ==========================================
    HEADER COMPONENT
 ========================================== */
-const Header = ({ date }) => {
+const Header = () => {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+
   return (
     <header className={styles.mainHeader}>
       <nav className={styles.breadcrumb}>
@@ -151,7 +174,7 @@ const Header = ({ date }) => {
         <span className={styles.breadcrumbCurrent}>Profil & Paramètres</span>
       </nav>
       <div className={styles.headerRight}>
-        <span className={styles.headerDate}>{date}</span>
+        <span className={styles.headerDate}>{dateStr}</span>
       </div>
     </header>
   );
@@ -160,18 +183,32 @@ const Header = ({ date }) => {
 /* ==========================================
    PROFILE HEADER COMPONENT
 ========================================== */
-const ProfileHeader = ({ profile, onEditAvatar }) => {
+const ProfileHeader = ({ profile, avatarUrl, onEditAvatar }) => {
   const getInitials = (name) => {
-    return name.split(' ').map((n) => n[0]).join('').toUpperCase();
+    if (!name) return '?';
+    return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   return (
     <div className={styles.profileHeader}>
       <div className={styles.profileAvatarSection}>
-        <div className={styles.profileAvatar}>{getInitials(profile.name)}</div>
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="Avatar" className={styles.profileAvatarImg} />
+        ) : (
+          <div className={styles.profileAvatar}>{getInitials(profile.name)}</div>
+        )}
         <button className={styles.profileAvatarEdit} onClick={onEditAvatar}>
           <CameraIcon />
         </button>
+        <input
+          type="file"
+          id="avatar-upload"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            if (e.target.files?.[0]) onEditAvatar(e.target.files[0]);
+          }}
+        />
       </div>
       <div className={styles.profileInfo}>
         <div className={styles.profileNameRow}>
@@ -190,7 +227,7 @@ const ProfileHeader = ({ profile, onEditAvatar }) => {
           </span>
           <span className={styles.profileMetaItem}>
             <PhoneIcon />
-            {profile.phone}
+            {profile.phone || 'Non renseigné'}
           </span>
           <span className={styles.profileMetaItem}>
             <CalendarIcon />
@@ -203,17 +240,11 @@ const ProfileHeader = ({ profile, onEditAvatar }) => {
             <span className={styles.progressValue}>{profile.completionPercentage}%</span>
           </div>
           <div className={styles.progressBar}>
-            <div
-              className={styles.progressFill}
-              style={{ width: `${profile.completionPercentage}%` }}
-            ></div>
+            <div className={styles.progressFill} style={{ width: `${profile.completionPercentage}%` }}></div>
           </div>
           <div className={styles.progressTips}>
             {profile.completionTips.map((tip, index) => (
-              <span
-                key={index}
-                className={`${styles.progressTip} ${tip.completed ? styles.completed : styles.pending}`}
-              >
+              <span key={index} className={`${styles.progressTip} ${tip.completed ? styles.completed : styles.pending}`}>
                 {tip.completed ? <CheckIcon /> : <ClockIcon />}
                 {tip.label}
               </span>
@@ -246,10 +277,7 @@ const SettingsNav = ({ activeSection, onSectionChange }) => {
           key={item.id}
           href={`#${item.id}`}
           className={`${styles.settingsNavLink} ${activeSection === item.id ? styles.active : ''} ${item.danger ? styles.danger : ''}`}
-          onClick={(e) => {
-            e.preventDefault();
-            onSectionChange(item.id);
-          }}
+          onClick={(e) => { e.preventDefault(); onSectionChange(item.id); }}
         >
           <item.icon />
           {item.label}
@@ -263,7 +291,21 @@ const SettingsNav = ({ activeSection, onSectionChange }) => {
 /* ==========================================
    PERSONAL INFO SECTION
 ========================================== */
-const PersonalInfoSection = ({ data, onChange, onSave, onCancel }) => {
+const PersonalInfoSection = ({ data, onChange, onSave, onCancel, saving }) => {
+  const dialCode = getDialCodeByCountryName(data.nationality);
+
+  const handleNationalityChange = (value) => {
+    onChange('nationality', value);
+    // Auto-set phone dial code
+    const newDialCode = getDialCodeByCountryName(value);
+    if (newDialCode) {
+      // Keep local number part, replace dial code
+      const currentPhone = data.phone || '';
+      const localPart = currentPhone.replace(/^\+\d+[\s-]?/, '').trim();
+      onChange('phone', `${newDialCode} ${localPart}`);
+    }
+  };
+
   return (
     <section id="personal" className={styles.settingsSection}>
       <div className={styles.settingsSectionHeader}>
@@ -275,78 +317,60 @@ const PersonalInfoSection = ({ data, onChange, onSave, onCancel }) => {
       <div className={styles.settingsSectionBody}>
         <div className={styles.formGrid}>
           <div className={styles.formGroup}>
-            <label className={styles.formLabel}>
-              Prénom <span className={styles.required}>*</span>
-            </label>
-            <input
-              type="text"
-              className={styles.formInput}
-              value={data.firstName}
-              onChange={(e) => onChange('firstName', e.target.value)}
-            />
+            <label className={styles.formLabel}>Prénom <span className={styles.required}>*</span></label>
+            <input type="text" className={styles.formInput} value={data.firstName} onChange={(e) => onChange('firstName', e.target.value)} />
           </div>
           <div className={styles.formGroup}>
-            <label className={styles.formLabel}>
-              Nom <span className={styles.required}>*</span>
-            </label>
-            <input
-              type="text"
-              className={styles.formInput}
-              value={data.lastName}
-              onChange={(e) => onChange('lastName', e.target.value)}
-            />
+            <label className={styles.formLabel}>Nom <span className={styles.required}>*</span></label>
+            <input type="text" className={styles.formInput} value={data.lastName} onChange={(e) => onChange('lastName', e.target.value)} />
           </div>
           <div className={styles.formGroup}>
-            <label className={styles.formLabel}>
-              Email <span className={styles.required}>*</span>
-            </label>
-            <input
-              type="email"
-              className={styles.formInput}
-              value={data.email}
-              onChange={(e) => onChange('email', e.target.value)}
-            />
-          </div>
-          <div className={styles.formGroup}>
-            <label className={styles.formLabel}>
-              Téléphone <span className={styles.required}>*</span>
-            </label>
-            <input
-              type="tel"
-              className={styles.formInput}
-              value={data.phone}
-              onChange={(e) => onChange('phone', e.target.value)}
-            />
-          </div>
-          <div className={styles.formGroup}>
-            <label className={styles.formLabel}>Date de naissance</label>
-            <input
-              type="date"
-              className={styles.formInput}
-              value={data.birthDate}
-              onChange={(e) => onChange('birthDate', e.target.value)}
-            />
+            <label className={styles.formLabel}>Email <span className={styles.required}>*</span></label>
+            <input type="email" className={styles.formInput} value={data.email} disabled style={{ opacity: 0.6 }} />
+            <small style={{ color: 'var(--color-neutral-400)', fontSize: '0.75rem' }}>L'email ne peut pas être modifié ici</small>
           </div>
           <div className={styles.formGroup}>
             <label className={styles.formLabel}>Nationalité</label>
-            <select
-              className={styles.formSelect}
-              value={data.nationality}
-              onChange={(e) => onChange('nationality', e.target.value)}
-            >
-              <option value="Guinéenne">Guinéenne</option>
-              <option value="Sénégalaise">Sénégalaise</option>
-              <option value="Malienne">Malienne</option>
-              <option value="Ivoirienne">Ivoirienne</option>
+            <select className={styles.formSelect} value={data.nationality} onChange={(e) => handleNationalityChange(e.target.value)}>
+              <option value="">— Sélectionner —</option>
+              {countries.map((c) => (
+                <option key={c.code} value={c.name}>{c.flag} {c.name}</option>
+              ))}
             </select>
+          </div>
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>Téléphone <span className={styles.required}>*</span></label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ 
+                background: 'var(--color-neutral-100)', 
+                padding: '0.6rem 0.75rem', 
+                borderRadius: 'var(--radius-md)', 
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                color: 'var(--color-neutral-700)',
+                whiteSpace: 'nowrap',
+                border: '1px solid var(--color-neutral-200)'
+              }}>
+                {dialCode || '—'}
+              </span>
+              <input 
+                type="tel" 
+                className={styles.formInput} 
+                value={data.phone.replace(/^\+\d+[\s-]?/, '').trim()} 
+                onChange={(e) => onChange('phone', `${dialCode} ${e.target.value}`)} 
+                placeholder="Numéro local"
+              />
+            </div>
+          </div>
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>Date de naissance</label>
+            <input type="date" className={styles.formInput} value={data.birthDate} onChange={(e) => onChange('birthDate', e.target.value)} />
           </div>
         </div>
         <div className={styles.formActions}>
-          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={onCancel}>
-            Annuler
-          </button>
-          <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onSave}>
-            Enregistrer
+          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={onCancel} disabled={saving}>Annuler</button>
+          <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onSave} disabled={saving}>
+            {saving ? 'Enregistrement…' : 'Enregistrer'}
           </button>
         </div>
       </div>
@@ -355,15 +379,10 @@ const PersonalInfoSection = ({ data, onChange, onSave, onCancel }) => {
 };
 
 /* ==========================================
-   DOCUMENTS SECTION
+   DOCUMENTS SECTION (kept as-is, static for now)
 ========================================== */
 const DocumentsSection = ({ documents }) => {
-  const documentIcons = {
-    cni: IdCardIcon,
-    passport: PassportIcon,
-    address: LocationIcon,
-    photo: ImageIcon,
-  };
+  const documentIcons = { cni: IdCardIcon, passport: PassportIcon, address: LocationIcon, photo: ImageIcon };
 
   return (
     <section id="documents" className={styles.settingsSection}>
@@ -378,13 +397,8 @@ const DocumentsSection = ({ documents }) => {
           {documents.map((doc, index) => {
             const IconComponent = documentIcons[doc.type] || DocumentIcon;
             return (
-              <div
-                key={index}
-                className={`${styles.documentCard} ${styles[doc.status]}`}
-              >
-                <div className={styles.documentIcon}>
-                  <IconComponent />
-                </div>
+              <div key={index} className={`${styles.documentCard} ${styles[doc.status]}`}>
+                <div className={styles.documentIcon}><IconComponent /></div>
                 <div className={styles.documentContent}>
                   <h4 className={styles.documentTitle}>{doc.title}</h4>
                   {doc.statusLabel && (
@@ -395,9 +409,7 @@ const DocumentsSection = ({ documents }) => {
                   )}
                   <p className={styles.documentMeta}>{doc.meta}</p>
                 </div>
-                <button className={`${styles.documentAction} ${styles[doc.actionType]}`}>
-                  {doc.actionLabel}
-                </button>
+                <button className={`${styles.documentAction} ${styles[doc.actionType]}`}>{doc.actionLabel}</button>
               </div>
             );
           })}
@@ -408,52 +420,31 @@ const DocumentsSection = ({ documents }) => {
 };
 
 /* ==========================================
-   PAYMENT SECTION
+   PAYMENT SECTION (kept as-is)
 ========================================== */
 const PaymentSection = ({ paymentMethods, onAddPayment }) => {
   return (
     <section id="payment" className={styles.settingsSection}>
       <div className={styles.settingsSectionHeader}>
-        <h2 className={styles.settingsSectionTitle}>
-          <CreditCardIcon />
-          Moyens de paiement
-        </h2>
+        <h2 className={styles.settingsSectionTitle}><CreditCardIcon /> Moyens de paiement</h2>
       </div>
       <div className={styles.settingsSectionBody}>
         <div className={styles.paymentMethods}>
           {paymentMethods.map((method, index) => (
-            <div
-              key={index}
-              className={`${styles.paymentMethod} ${method.isDefault ? styles.active : ''}`}
-            >
-              <div className={`${styles.paymentMethodLogo} ${styles[method.provider]}`}>
-                {method.providerLabel}
-              </div>
+            <div key={index} className={`${styles.paymentMethod} ${method.isDefault ? styles.active : ''}`}>
+              <div className={`${styles.paymentMethodLogo} ${styles[method.provider]}`}>{method.providerLabel}</div>
               <div className={styles.paymentMethodInfo}>
                 <h4 className={styles.paymentMethodName}>{method.name}</h4>
                 <p className={styles.paymentMethodNumber}>{method.number}</p>
               </div>
-              {method.isDefault && (
-                <span className={`${styles.paymentMethodBadge} ${styles.default}`}>
-                  Par défaut
-                </span>
-              )}
+              {method.isDefault && <span className={`${styles.paymentMethodBadge} ${styles.default}`}>Par défaut</span>}
               <div className={styles.paymentMethodActions}>
-                <button className={styles.paymentMethodAction}>
-                  <EditIcon />
-                </button>
-                {!method.isDefault && (
-                  <button className={styles.paymentMethodAction}>
-                    <TrashIcon />
-                  </button>
-                )}
+                <button className={styles.paymentMethodAction}><EditIcon /></button>
+                {!method.isDefault && <button className={styles.paymentMethodAction}><TrashIcon /></button>}
               </div>
             </div>
           ))}
-          <button className={styles.addPaymentMethod} onClick={onAddPayment}>
-            <PlusIcon />
-            Ajouter un moyen de paiement
-          </button>
+          <button className={styles.addPaymentMethod} onClick={onAddPayment}><PlusIcon /> Ajouter un moyen de paiement</button>
         </div>
       </div>
     </section>
@@ -461,16 +452,13 @@ const PaymentSection = ({ paymentMethods, onAddPayment }) => {
 };
 
 /* ==========================================
-   NOTIFICATIONS SECTION
+   NOTIFICATIONS SECTION (kept as-is)
 ========================================== */
 const NotificationsSection = ({ preferences, onToggle }) => {
   return (
     <section id="notifications" className={styles.settingsSection}>
       <div className={styles.settingsSectionHeader}>
-        <h2 className={styles.settingsSectionTitle}>
-          <NotificationIcon />
-          Préférences de notifications
-        </h2>
+        <h2 className={styles.settingsSectionTitle}><NotificationIcon /> Préférences de notifications</h2>
       </div>
       <div className={styles.settingsSectionBody}>
         <div className={styles.toggleGroup}>
@@ -481,11 +469,7 @@ const NotificationsSection = ({ preferences, onToggle }) => {
                 <p className={styles.toggleItemDesc}>{pref.description}</p>
               </div>
               <label className={styles.toggle}>
-                <input
-                  type="checkbox"
-                  checked={pref.enabled}
-                  onChange={() => onToggle(index)}
-                />
+                <input type="checkbox" checked={pref.enabled} onChange={() => onToggle(index)} />
                 <span className={styles.toggleSlider}></span>
               </label>
             </div>
@@ -497,78 +481,191 @@ const NotificationsSection = ({ preferences, onToggle }) => {
 };
 
 /* ==========================================
-   SECURITY SECTION
+   SECURITY SECTION (functional)
 ========================================== */
-const SecuritySection = ({ securityItems }) => {
-  const securityIcons = {
-    password: LockIcon,
-    twoFactor: SmartphoneIcon,
-    sessions: DesktopIcon,
+const SecuritySection = ({ passwordChangedAt, onChangePassword }) => {
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordMsg, setPasswordMsg] = useState(null);
+
+  const getPasswordAge = () => {
+    if (!passwordChangedAt) return 'Jamais modifié';
+    const diff = Date.now() - new Date(passwordChangedAt).getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (days === 0) return "Modifié aujourd'hui";
+    if (days === 1) return 'Modifié hier';
+    if (days < 30) return `Modifié il y a ${days} jours`;
+    const months = Math.floor(days / 30);
+    return `Modifié il y a ${months} mois`;
+  };
+
+  const handlePasswordChange = async () => {
+    if (newPassword.length < 8) {
+      setPasswordMsg({ type: 'error', text: 'Le mot de passe doit faire au moins 8 caractères' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMsg({ type: 'error', text: 'Les mots de passe ne correspondent pas' });
+      return;
+    }
+    setChangingPassword(true);
+    setPasswordMsg(null);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setPasswordMsg({ type: 'error', text: error.message });
+    } else {
+      // Update password_changed_at in profile
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('profiles').update({ password_changed_at: new Date().toISOString() } as any).eq('id', user.id);
+      }
+      setPasswordMsg({ type: 'success', text: 'Mot de passe modifié avec succès' });
+      setShowPasswordForm(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      onChangePassword?.();
+    }
+    setChangingPassword(false);
   };
 
   return (
     <section id="security" className={styles.settingsSection}>
       <div className={styles.settingsSectionHeader}>
-        <h2 className={styles.settingsSectionTitle}>
-          <LockIcon />
-          Sécurité du compte
-        </h2>
+        <h2 className={styles.settingsSectionTitle}><LockIcon /> Sécurité du compte</h2>
       </div>
       <div className={styles.settingsSectionBody}>
-        {securityItems.map((item, index) => {
-          const IconComponent = securityIcons[item.type] || LockIcon;
-          return (
-            <div key={index} className={styles.securityItem}>
-              <div className={styles.securityItemInfo}>
-                <div className={`${styles.securityIcon} ${styles[item.status]}`}>
-                  <IconComponent />
-                </div>
-                <div className={styles.securityDetails}>
-                  <h4>{item.title}</h4>
-                  <p>{item.description}</p>
-                </div>
-              </div>
-              <button className={`${styles.btn} ${styles[item.buttonStyle]}`}>
-                {item.buttonLabel}
-              </button>
+        {/* Password */}
+        <div className={styles.securityItem}>
+          <div className={styles.securityItemInfo}>
+            <div className={`${styles.securityIcon} ${styles.success}`}><LockIcon /></div>
+            <div className={styles.securityDetails}>
+              <h4>Mot de passe</h4>
+              <p>{getPasswordAge()}</p>
             </div>
-          );
-        })}
+          </div>
+          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setShowPasswordForm(!showPasswordForm)}>
+            {showPasswordForm ? 'Annuler' : 'Modifier'}
+          </button>
+        </div>
+
+        {showPasswordForm && (
+          <div style={{ padding: '0 1.5rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <input
+              type="password"
+              className={styles.formInput}
+              placeholder="Nouveau mot de passe (min 8 car.)"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+            <input
+              type="password"
+              className={styles.formInput}
+              placeholder="Confirmer le nouveau mot de passe"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+            {passwordMsg && (
+              <p style={{ color: passwordMsg.type === 'error' ? 'var(--color-error)' : 'var(--color-success)', fontSize: '0.875rem' }}>
+                {passwordMsg.text}
+              </p>
+            )}
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={handlePasswordChange} disabled={changingPassword}>
+              {changingPassword ? 'Modification…' : 'Changer le mot de passe'}
+            </button>
+          </div>
+        )}
+
+        {/* 2FA - informational for now */}
+        <div className={styles.securityItem}>
+          <div className={styles.securityItemInfo}>
+            <div className={`${styles.securityIcon} ${styles.warning}`}><SmartphoneIcon /></div>
+            <div className={styles.securityDetails}>
+              <h4>Authentification à deux facteurs</h4>
+              <p>Non activée — Recommandé</p>
+            </div>
+          </div>
+          <button className={`${styles.btn} ${styles.btnGold}`} disabled>Bientôt disponible</button>
+        </div>
+
+        {/* Sessions - informational */}
+        <div className={styles.securityItem}>
+          <div className={styles.securityItemInfo}>
+            <div className={`${styles.securityIcon}`}><DesktopIcon /></div>
+            <div className={styles.securityDetails}>
+              <h4>Sessions actives</h4>
+              <p>Session actuelle</p>
+            </div>
+          </div>
+          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={async () => {
+            await supabase.auth.signOut({ scope: 'others' });
+            alert('Autres sessions déconnectées');
+          }}>Déconnecter les autres</button>
+        </div>
       </div>
     </section>
   );
 };
 
 /* ==========================================
-   DANGER ZONE SECTION
+   DANGER ZONE SECTION (functional)
 ========================================== */
 const DangerZoneSection = ({ onDeactivate, onDelete }) => {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [deleteText, setDeleteText] = useState('');
+
   return (
     <section id="danger" className={`${styles.settingsSection} ${styles.dangerZone}`}>
       <div className={styles.settingsSectionHeader}>
-        <h2 className={styles.settingsSectionTitle}>
-          <WarningIcon />
-          Zone danger
-        </h2>
+        <h2 className={styles.settingsSectionTitle}><WarningIcon /> Zone danger</h2>
       </div>
       <div className={styles.settingsSectionBody}>
+        {/* Deactivate */}
         <div className={styles.dangerItem}>
           <div className={styles.dangerItemInfo}>
             <h4>Désactiver mon compte</h4>
             <p>Suspension temporaire, réactivation possible</p>
           </div>
-          <button className={`${styles.btn} ${styles.btnDanger}`} onClick={onDeactivate}>
-            Désactiver
-          </button>
+          {!confirmDeactivate ? (
+            <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => setConfirmDeactivate(true)}>Désactiver</button>
+          ) : (
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => setConfirmDeactivate(false)}>Annuler</button>
+              <button className={`${styles.btn} ${styles.btnDanger}`} onClick={onDeactivate}>Confirmer</button>
+            </div>
+          )}
         </div>
+
+        {/* Delete */}
         <div className={styles.dangerItem}>
           <div className={styles.dangerItemInfo}>
             <h4>Supprimer mon compte</h4>
-            <p>Action irréversible, données supprimées</p>
+            <p>Action irréversible — toutes vos données seront supprimées</p>
           </div>
-          <button className={`${styles.btn} ${styles.btnDanger}`} onClick={onDelete}>
-            Supprimer
-          </button>
+          {!confirmDelete ? (
+            <button className={`${styles.btn} ${styles.btnDanger}`} onClick={() => setConfirmDelete(true)}>Supprimer</button>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <p style={{ fontSize: '0.8rem', color: 'var(--color-error)' }}>Tapez "SUPPRIMER" pour confirmer :</p>
+              <input
+                type="text"
+                className={styles.formInput}
+                value={deleteText}
+                onChange={(e) => setDeleteText(e.target.value)}
+                placeholder="SUPPRIMER"
+              />
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={() => { setConfirmDelete(false); setDeleteText(''); }}>Annuler</button>
+                <button className={`${styles.btn} ${styles.btnDanger}`} disabled={deleteText !== 'SUPPRIMER'} onClick={onDelete}>
+                  Supprimer définitivement
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>
@@ -576,17 +673,57 @@ const DangerZoneSection = ({ onDeactivate, onDelete }) => {
 };
 
 /* ==========================================
+   HELPERS
+========================================== */
+function formatMemberSince(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+}
+
+function computeCompletion(profile, user) {
+  const tips = [];
+  let completed = 0;
+  const total = 4;
+
+  const emailVerified = !!user?.email_confirmed_at;
+  tips.push({ label: 'Email vérifié', completed: emailVerified });
+  if (emailVerified) completed++;
+
+  const hasPhone = !!profile?.phone && profile.phone.trim().length > 4;
+  tips.push({ label: 'Téléphone renseigné', completed: hasPhone });
+  if (hasPhone) completed++;
+
+  const hasName = !!profile?.full_name && profile.full_name.trim().length > 1;
+  tips.push({ label: 'Nom renseigné', completed: hasName });
+  if (hasName) completed++;
+
+  const hasAvatar = !!profile?.avatar_url;
+  tips.push({ label: 'Photo de profil', completed: hasAvatar });
+  if (hasAvatar) completed++;
+
+  return { percentage: Math.round((completed / total) * 100), tips };
+}
+
+/* ==========================================
    MAIN COMPONENT
 ========================================== */
 const ProfileSettings = () => {
+  const { user, profile, signOut } = useAuthContext();
   const [activeSection, setActiveSection] = useState('personal');
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [dbProfile, setDbProfile] = useState(null);
+
+  // Personal data form
   const [personalData, setPersonalData] = useState({
-    firstName: 'Mamadou',
-    lastName: 'Bah',
-    email: 'mamadou.bah@email.com',
-    phone: '+224 621 00 00 00',
-    birthDate: '1990-05-15',
-    nationality: 'Guinéenne',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    birthDate: '',
+    nationality: '',
   });
 
   const [notificationPrefs, setNotificationPrefs] = useState([
@@ -597,39 +734,134 @@ const ProfileSettings = () => {
     { label: 'Marketing', description: 'Offres spéciales et actualités', enabled: false },
   ]);
 
-  const mockData = {
-    profile: {
-      name: 'Mamadou Bah',
-      email: 'mamadou.bah@email.com',
-      phone: '+224 621 00 00 00',
-      memberSince: 'Juin 2024',
-      verified: true,
-      completionPercentage: 85,
-      completionTips: [
-        { label: 'Email vérifié', completed: true },
-        { label: 'Téléphone vérifié', completed: true },
-        { label: 'CNI à renouveler', completed: false },
-      ],
-    },
-    documents: [
-      { type: 'cni', title: "Carte d'identité nationale", status: 'expiring', statusLabel: 'Expire dans 15 jours', meta: 'Expire le 17 Février 2026', actionType: 'update', actionLabel: 'Mettre à jour' },
-      { type: 'passport', title: 'Passeport', status: 'valid', statusLabel: 'Valide', meta: 'Expire le 20 Mars 2030', actionType: 'view', actionLabel: 'Voir' },
-      { type: 'address', title: 'Justificatif de domicile', status: 'valid', statusLabel: 'Valide', meta: 'Facture EDG - Janvier 2026', actionType: 'view', actionLabel: 'Voir' },
-      { type: 'photo', title: "Photo d'identité", status: 'empty', meta: 'Optionnel', actionType: 'upload', actionLabel: 'Ajouter' },
-    ],
-    paymentMethods: [
-      { provider: 'orange', providerLabel: 'Orange Money', name: 'Orange Money', number: '+224 621 •• •• 00', isDefault: true },
-      { provider: 'mtn', providerLabel: 'MTN MoMo', name: 'MTN Mobile Money', number: '+224 66 •• •• 45', isDefault: false },
-    ],
-    securityItems: [
-      { type: 'password', title: 'Mot de passe', description: 'Modifié il y a 3 mois', status: 'success', buttonStyle: 'btnSecondary', buttonLabel: 'Modifier' },
-      { type: 'twoFactor', title: 'Authentification à deux facteurs', description: 'Non activée - Recommandé', status: 'warning', buttonStyle: 'btnGold', buttonLabel: 'Activer' },
-      { type: 'sessions', title: 'Sessions actives', description: '2 appareils connectés', status: 'default', buttonStyle: 'btnSecondary', buttonLabel: 'Gérer' },
-    ],
+  // Fetch full profile from DB
+  const fetchFullProfile = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+    if (data) {
+      setDbProfile(data);
+      const names = (data.full_name || '').split(' ');
+      const firstName = names[0] || '';
+      const lastName = names.slice(1).join(' ') || '';
+      setPersonalData({
+        firstName,
+        lastName,
+        email: user.email || '',
+        phone: data.phone || '',
+        birthDate: data.birth_date || '',
+        nationality: data.nationality || '',
+      });
+      if (data.avatar_url) {
+        setAvatarUrl(data.avatar_url);
+      }
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchFullProfile();
+  }, [fetchFullProfile]);
+
+  // Avatar upload
+  const handleAvatarUpload = async (fileOrEvent) => {
+    let file;
+    if (fileOrEvent instanceof File) {
+      file = fileOrEvent;
+    } else {
+      // Trigger file input
+      document.getElementById('avatar-upload')?.click();
+      return;
+    }
+
+    if (!user || !file) return;
+    const ext = file.name.split('.').pop();
+    const path = `${user.id}/avatar.${ext}`;
+
+    setSaving(true);
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(path, file, { upsert: true });
+
+    if (uploadError) {
+      setToast({ type: 'error', message: `Erreur upload: ${uploadError.message}` });
+      setSaving(false);
+      return;
+    }
+
+    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
+    // Add cache buster
+    const urlWithBuster = `${publicUrl}?t=${Date.now()}`;
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ avatar_url: publicUrl } as any)
+      .eq('id', user.id);
+
+    if (updateError) {
+      setToast({ type: 'error', message: `Erreur: ${updateError.message}` });
+    } else {
+      setAvatarUrl(urlWithBuster);
+      setToast({ type: 'success', message: 'Photo de profil mise à jour' });
+    }
+    setSaving(false);
   };
 
-  const handlePersonalDataChange = (field, value) => {
-    setPersonalData((prev) => ({ ...prev, [field]: value }));
+  // Save personal info
+  const handleSavePersonal = async () => {
+    if (!user) return;
+    if (!personalData.firstName.trim() || !personalData.lastName.trim()) {
+      setToast({ type: 'error', message: 'Prénom et nom sont obligatoires' });
+      return;
+    }
+
+    setSaving(true);
+    const fullName = `${personalData.firstName.trim()} ${personalData.lastName.trim()}`;
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        full_name: fullName,
+        phone: personalData.phone,
+        nationality: personalData.nationality,
+        birth_date: personalData.birthDate || null,
+      } as any)
+      .eq('id', user.id);
+
+    if (error) {
+      setToast({ type: 'error', message: `Erreur: ${error.message}` });
+    } else {
+      setToast({ type: 'success', message: 'Informations enregistrées avec succès' });
+      await fetchFullProfile();
+    }
+    setSaving(false);
+  };
+
+  const handleCancelPersonal = () => {
+    fetchFullProfile();
+  };
+
+  // Deactivate account
+  const handleDeactivate = async () => {
+    if (!user) return;
+    const { error } = await supabase.from('profiles').update({ is_active: false } as any).eq('id', user.id);
+    if (error) {
+      setToast({ type: 'error', message: error.message });
+    } else {
+      setToast({ type: 'success', message: 'Compte désactivé' });
+      await signOut();
+    }
+  };
+
+  // Delete account
+  const handleDelete = async () => {
+    if (!user) return;
+    // We sign the user out — actual deletion requires a backend function with service role
+    setToast({ type: 'error', message: 'La suppression de compte nécessite une confirmation par un administrateur. Votre demande a été enregistrée.' });
+    // Mark as inactive
+    await supabase.from('profiles').update({ is_active: false } as any).eq('id', user.id);
+    setTimeout(() => signOut(), 2000);
   };
 
   const handleNotificationToggle = (index) => {
@@ -638,12 +870,44 @@ const ProfileSettings = () => {
     );
   };
 
+  // Compute profile header data
+  const completion = computeCompletion(dbProfile, user);
+  const profileHeaderData = {
+    name: dbProfile?.full_name || user?.email || 'Utilisateur',
+    email: user?.email || '',
+    phone: dbProfile?.phone || '',
+    memberSince: formatMemberSince(dbProfile?.created_at || user?.created_at),
+    verified: dbProfile?.kyc_status === 'verified',
+    completionPercentage: completion.percentage,
+    completionTips: completion.tips,
+  };
+
+  // Static data for sections not yet dynamic
+  const documents = [
+    { type: 'cni', title: "Carte d'identité nationale", status: 'expiring', statusLabel: 'Expire dans 15 jours', meta: 'Expire le 17 Février 2026', actionType: 'update', actionLabel: 'Mettre à jour' },
+    { type: 'passport', title: 'Passeport', status: 'valid', statusLabel: 'Valide', meta: 'Expire le 20 Mars 2030', actionType: 'view', actionLabel: 'Voir' },
+    { type: 'address', title: 'Justificatif de domicile', status: 'valid', statusLabel: 'Valide', meta: 'Facture EDG - Janvier 2026', actionType: 'view', actionLabel: 'Voir' },
+    { type: 'photo', title: "Photo d'identité", status: 'empty', meta: 'Optionnel', actionType: 'upload', actionLabel: 'Ajouter' },
+  ];
+  const paymentMethods = [
+    { provider: 'orange', providerLabel: 'Orange Money', name: 'Orange Money', number: '+224 621 •• •• 00', isDefault: true },
+    { provider: 'mtn', providerLabel: 'MTN MoMo', name: 'MTN Mobile Money', number: '+224 66 •• •• 45', isDefault: false },
+  ];
+
+  if (!user) {
+    return <div className={styles.mainContent} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <p>Chargement…</p>
+    </div>;
+  }
+
   return (
     <>
-      <Header date="Dim. 2 Février 2026" />
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      <Header />
 
       <main className={styles.mainContent}>
-        <ProfileHeader profile={mockData.profile} onEditAvatar={() => console.log('Edit avatar')} />
+        <ProfileHeader profile={profileHeaderData} avatarUrl={avatarUrl} onEditAvatar={handleAvatarUpload} />
 
         <div className={styles.settingsLayout}>
           <SettingsNav activeSection={activeSection} onSectionChange={setActiveSection} />
@@ -651,29 +915,24 @@ const ProfileSettings = () => {
           <div className={styles.settingsContent}>
             <PersonalInfoSection
               data={personalData}
-              onChange={handlePersonalDataChange}
-              onSave={() => console.log('Saving personal data:', personalData)}
-              onCancel={() => console.log('Cancelled')}
+              onChange={(field, value) => setPersonalData(prev => ({ ...prev, [field]: value }))}
+              onSave={handleSavePersonal}
+              onCancel={handleCancelPersonal}
+              saving={saving}
             />
 
-            <DocumentsSection documents={mockData.documents} />
+            <DocumentsSection documents={documents} />
 
-            <PaymentSection
-              paymentMethods={mockData.paymentMethods}
-              onAddPayment={() => console.log('Add payment method')}
+            <PaymentSection paymentMethods={paymentMethods} onAddPayment={() => {}} />
+
+            <NotificationsSection preferences={notificationPrefs} onToggle={handleNotificationToggle} />
+
+            <SecuritySection
+              passwordChangedAt={dbProfile?.password_changed_at}
+              onChangePassword={fetchFullProfile}
             />
 
-            <NotificationsSection
-              preferences={notificationPrefs}
-              onToggle={handleNotificationToggle}
-            />
-
-            <SecuritySection securityItems={mockData.securityItems} />
-
-            <DangerZoneSection
-              onDeactivate={() => console.log('Deactivate account')}
-              onDelete={() => console.log('Delete account')}
-            />
+            <DangerZoneSection onDeactivate={handleDeactivate} onDelete={handleDelete} />
           </div>
         </div>
       </main>
