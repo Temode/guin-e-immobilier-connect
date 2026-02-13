@@ -80,14 +80,16 @@ export function useAuth() {
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: `${window.location.origin}/user-role`,
         data: {
           full_name: metadata.full_name,
           phone: metadata.phone,
         },
       },
     });
-    if (data.session) {
+    if (data.session && data.user) {
+      const profile = await fetchProfile(data.user.id);
+      setState({ user: data.user, session: data.session, loading: false, profile });
       navigate('/user-role');
     }
     return { data, error };
