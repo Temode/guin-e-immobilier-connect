@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import styles from './Agentmesbiens.module.css';
+import { useAuthContext } from '@/context/AuthContext';
+import { getProperties, deleteProperty, type PropertyData } from '@/services/propertyService';
+import PropertyForm from './PropertyForm';
 
 /* ==========================================
    ICONS COMPONENTS
@@ -52,7 +55,7 @@ const SunIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const StarIcon = ({ className, filled = false }: { className?: string; filled?: boolean }) => (
+const StarIcon = ({ className, filled = false }: { className?: string; filled?: boolean }) =>
   filled ? (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -61,14 +64,7 @@ const StarIcon = ({ className, filled = false }: { className?: string; filled?: 
     <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
     </svg>
-  )
-);
-
-const SparklesIcon = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-    <path fillRule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5z" clipRule="evenodd" />
-  </svg>
-);
+  );
 
 const CheckCircleIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -168,22 +164,16 @@ const HouseIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const DocumentIcon = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-);
-
-const ArchiveIcon = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+const SparklesIcon = ({ className }: { className?: string }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+    <path fillRule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5z" clipRule="evenodd" />
   </svg>
 );
 
 /* ==========================================
    TOP BAR COMPONENT
 ========================================== */
-const TopBar = () => {
+const TopBar = ({ onAddClick }: { onAddClick: () => void }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   return (
@@ -191,7 +181,7 @@ const TopBar = () => {
       <div className={styles.topBarLeft}>
         <div className={styles.pageContext}>
           <span className={styles.pageDate}>
-            Mardi 4 février 2025
+            {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             <span className={styles.weather}>
               <SunIcon />
               28°C Conakry
@@ -214,7 +204,7 @@ const TopBar = () => {
           <NotificationIcon />
           <span className={styles.notificationBadge}>3</span>
         </button>
-        <button className={`${styles.btn} ${styles.btnPrimary}`}>
+        <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onAddClick}>
           <PlusIcon />
           Ajouter un bien
         </button>
@@ -226,8 +216,8 @@ const TopBar = () => {
 /* ==========================================
    STATS CARDS COMPONENT
 ========================================== */
-const StatsGrid = ({ stats }) => {
-  const icons = {
+const StatsGrid = ({ stats }: { stats: any[] }) => {
+  const icons: Record<string, any> = {
     check: CheckCircleIcon,
     clock: ClockIcon,
     badge: BadgeCheckIcon,
@@ -236,7 +226,7 @@ const StatsGrid = ({ stats }) => {
 
   return (
     <div className={styles.statsGrid}>
-      {stats.map((stat, index) => {
+      {stats.map((stat: any, index: number) => {
         const IconComponent = icons[stat.icon] || CheckCircleIcon;
         return (
           <div
@@ -258,37 +248,9 @@ const StatsGrid = ({ stats }) => {
 };
 
 /* ==========================================
-   ALERTS BANNER COMPONENT
-========================================== */
-const AlertsBanner = ({ alerts }) => {
-  return (
-    <div className={styles.alertsBanner}>
-      <div className={styles.alertsBannerIcon}>
-        <WarningIcon />
-      </div>
-      <div className={styles.alertsBannerContent}>
-        {alerts.map((alert, index) => (
-          <div key={index} className={styles.alertsBannerItem}>
-            <span className={`${styles.dot} ${styles[alert.type]}`}></span>
-            <span>
-              <strong>{alert.count}</strong> {alert.text}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className={styles.alertsBannerAction}>
-        <button className={`${styles.btn} ${styles.btnOutline} ${styles.btnSm}`}>
-          Voir les alertes
-        </button>
-      </div>
-    </div>
-  );
-};
-
-/* ==========================================
    FILTERS BAR COMPONENT
 ========================================== */
-const FiltersBar = ({ filters, onFilterChange, viewMode, onViewModeChange }) => {
+const FiltersBar = ({ filters, onFilterChange, viewMode, onViewModeChange }: any) => {
   return (
     <div className={styles.filtersBar}>
       <div className={styles.filtersLeft}>
@@ -302,41 +264,21 @@ const FiltersBar = ({ filters, onFilterChange, viewMode, onViewModeChange }) => 
           />
         </div>
         <div className={styles.filterSelect}>
-          <select
-            value={filters.type}
-            onChange={(e) => onFilterChange('type', e.target.value)}
-          >
+          <select value={filters.type} onChange={(e) => onFilterChange('type', e.target.value)}>
             <option value="">Tous les types</option>
-            <option value="apartment">Appartement</option>
+            <option value="appartement">Appartement</option>
             <option value="villa">Villa</option>
             <option value="studio">Studio</option>
-            <option value="duplex">Duplex</option>
+            <option value="maison">Maison</option>
           </select>
         </div>
         <div className={styles.filterSelect}>
-          <select
-            value={filters.status}
-            onChange={(e) => onFilterChange('status', e.target.value)}
-          >
+          <select value={filters.status} onChange={(e) => onFilterChange('status', e.target.value)}>
             <option value="">Tous les statuts</option>
-            <option value="active">Actif</option>
-            <option value="pending">En attente</option>
+            <option value="available">Disponible</option>
             <option value="rented">Loué</option>
-            <option value="inactive">Inactif</option>
-          </select>
-        </div>
-        <div className={styles.filterSelect}>
-          <select
-            value={filters.location}
-            onChange={(e) => onFilterChange('location', e.target.value)}
-          >
-            <option value="">Tous les quartiers</option>
-            <option value="kipe">Kipé</option>
-            <option value="ratoma">Ratoma</option>
-            <option value="lambanyi">Lambanyi</option>
-            <option value="cosa">Cosa</option>
-            <option value="nongo">Nongo</option>
-            <option value="matam">Matam</option>
+            <option value="sold">Vendu</option>
+            <option value="draft">Brouillon</option>
           </select>
         </div>
       </div>
@@ -359,14 +301,10 @@ const FiltersBar = ({ filters, onFilterChange, viewMode, onViewModeChange }) => 
         </div>
         <div className={styles.sortSelect}>
           <span>Trier par:</span>
-          <select
-            value={filters.sort}
-            onChange={(e) => onFilterChange('sort', e.target.value)}
-          >
+          <select value={filters.sort} onChange={(e) => onFilterChange('sort', e.target.value)}>
             <option value="recent">Plus récent</option>
             <option value="price-high">Prix décroissant</option>
             <option value="price-low">Prix croissant</option>
-            <option value="views">Plus de vues</option>
           </select>
         </div>
       </div>
@@ -377,35 +315,44 @@ const FiltersBar = ({ filters, onFilterChange, viewMode, onViewModeChange }) => 
 /* ==========================================
    PROPERTY CARD COMPONENT
 ========================================== */
-const PropertyCard = ({ property }) => {
+const PropertyCard = ({ property, onEdit, onDelete }: { property: any; onEdit: (p: any) => void; onDelete: (id: string) => void }) => {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const statusBadges = {
-    active: { label: 'Actif', class: 'active', icon: CheckCircleFilledIcon },
-    pending: { label: 'En attente', class: 'pending', icon: ClockIcon },
+  const statusMap: Record<string, { label: string; class: string; icon: any }> = {
+    available: { label: 'Disponible', class: 'active', icon: CheckCircleFilledIcon },
     rented: { label: 'Loué', class: 'rented', icon: CheckCircleFilledIcon },
-    inactive: { label: 'Inactif', class: 'inactive', icon: BanIcon },
-    expiring: { label: `Expire ${property.expiresIn}`, class: 'expiring', icon: WarningIcon },
+    sold: { label: 'Vendu', class: 'rented', icon: CheckCircleFilledIcon },
+    draft: { label: 'Brouillon', class: 'pending', icon: ClockIcon },
   };
 
-  const statusBadge = statusBadges[property.status] || statusBadges.active;
+  const statusBadge = statusMap[property.status] || statusMap.available;
   const StatusIcon = statusBadge.icon;
+  const images = (property.images as string[]) || [];
+  const firstImage = images.length > 0 ? images[0] : null;
+
+  const daysSinceCreated = Math.floor(
+    (Date.now() - new Date(property.created_at).getTime()) / (1000 * 60 * 60 * 24)
+  );
 
   return (
-    <div className={`${styles.propertyCard} ${property.hasAlert ? styles.alert : ''}`}>
+    <div className={styles.propertyCard}>
       <div className={styles.propertyImage}>
-        <div className={styles.propertyImagePlaceholder}>
-          <HouseIcon />
-        </div>
+        {firstImage ? (
+          <img src={firstImage} alt={property.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <div className={styles.propertyImagePlaceholder}>
+            <HouseIcon />
+          </div>
+        )}
         <div className={styles.propertyBadges}>
           <span className={`${styles.propertyBadge} ${styles[statusBadge.class]}`}>
             <StatusIcon />
             {statusBadge.label}
           </span>
-          {property.isPremium && (
+          {property.verified && (
             <span className={`${styles.propertyBadge} ${styles.premium}`}>
               <StarIcon filled />
-              Top
+              Vérifié
             </span>
           )}
         </div>
@@ -413,57 +360,45 @@ const PropertyCard = ({ property }) => {
 
       <div className={styles.propertyContent}>
         <div className={styles.propertyType}>
-          {property.type} • {property.surface}m²
+          {property.type} • {property.area ? `${property.area}m²` : '—'}
         </div>
         <h3 className={styles.propertyTitle}>{property.title}</h3>
         <p className={styles.propertyLocation}>
           <LocationIcon />
-          {property.location}
+          {[property.quartier, property.commune, property.city].filter(Boolean).join(', ')}
         </p>
-        <div className={`${styles.propertyPrice} ${property.isPremium ? styles.premium : ''}`}>
-          {property.price.toLocaleString('fr-GN')} <span>GNF/mois</span>
+        <div className={styles.propertyPrice}>
+          {Number(property.price).toLocaleString('fr-GN')} <span>{property.currency}/{property.transaction_type === 'location' ? 'mois' : ''}</span>
         </div>
 
         <div className={styles.propertyDivider}></div>
 
         <div className={styles.propertyStats}>
-          <div className={`${styles.propertyStat} ${property.stats.views < 20 ? styles.error : ''}`}>
-            <EyeIcon />
-            <strong>{property.stats.views}</strong> vues
-          </div>
-          <div className={`${styles.propertyStat} ${property.stats.visits === 0 ? styles.error : ''}`}>
+          <div className={styles.propertyStat}>
             <CalendarIcon />
-            <strong>{property.stats.visits}</strong> visites
+            <strong>{daysSinceCreated}j</strong> en ligne
           </div>
-          <div className={`${styles.propertyStat} ${property.stats.daysOnline > 20 ? styles.warning : ''}`}>
-            <ClockIcon />
-            <strong>{property.stats.daysOnline}j</strong> en ligne
-          </div>
-        </div>
-
-        <div className={styles.propertyOwner}>
-          <div className={styles.propertyOwnerAvatar}>{property.owner.initials}</div>
-          <div className={styles.propertyOwnerInfo}>
-            <div className={styles.propertyOwnerLabel}>Propriétaire</div>
-            <div className={styles.propertyOwnerName}>{property.owner.name}</div>
-          </div>
+          {property.bedrooms != null && (
+            <div className={styles.propertyStat}>
+              <BuildingIcon />
+              <strong>{property.bedrooms}</strong> ch.
+            </div>
+          )}
+          {property.furnished && (
+            <div className={styles.propertyStat}>
+              <CheckCircleIcon />
+              Meublé
+            </div>
+          )}
         </div>
 
         <div className={styles.propertyFooter}>
-          {property.status === 'expiring' ? (
-            <button className={`${styles.btn} ${styles.btnGold} ${styles.btnSm}`}>
-              <SparklesIcon />
-              Booster
-            </button>
-          ) : property.status === 'rented' ? (
-            <button className={`${styles.btn} ${styles.btnOutline} ${styles.btnSm}`}>
-              Voir locataire
-            </button>
-          ) : (
-            <button className={`${styles.btn} ${styles.btnOutline} ${styles.btnSm}`}>
-              Voir détails
-            </button>
-          )}
+          <button
+            className={`${styles.btn} ${styles.btnOutline} ${styles.btnSm}`}
+            onClick={() => onEdit(property)}
+          >
+            Modifier
+          </button>
 
           <div className={styles.dropdown}>
             <button
@@ -473,43 +408,18 @@ const PropertyCard = ({ property }) => {
               <DotsVerticalIcon />
             </button>
             <div className={`${styles.dropdownMenu} ${menuOpen ? styles.open : ''}`}>
-              <div className={styles.dropdownItem}>
+              <div className={styles.dropdownItem} onClick={() => { setMenuOpen(false); onEdit(property); }}>
                 <EditIcon />
                 Modifier
               </div>
-              <div className={styles.dropdownItem}>
-                <CurrencyIcon />
-                Modifier le prix
-              </div>
               <div className={styles.dropdownDivider}></div>
-              <div className={`${styles.dropdownItem} ${styles.gold}`}>
-                <SparklesIcon />
-                Booster
+              <div
+                className={`${styles.dropdownItem} ${styles.danger}`}
+                onClick={() => { setMenuOpen(false); onDelete(property.id); }}
+              >
+                <TrashIcon />
+                Supprimer
               </div>
-              <div className={styles.dropdownDivider}></div>
-              {property.status === 'rented' ? (
-                <>
-                  <div className={styles.dropdownItem}>
-                    <DocumentIcon />
-                    Voir le contrat
-                  </div>
-                  <div className={styles.dropdownItem}>
-                    <ArchiveIcon />
-                    Archiver
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className={styles.dropdownItem}>
-                    <BanIcon />
-                    Désactiver
-                  </div>
-                  <div className={`${styles.dropdownItem} ${styles.danger}`}>
-                    <TrashIcon />
-                    Supprimer
-                  </div>
-                </>
-              )}
             </div>
           </div>
         </div>
@@ -521,14 +431,11 @@ const PropertyCard = ({ property }) => {
 /* ==========================================
    PAGINATION COMPONENT
 ========================================== */
-const Pagination = ({ currentPage, totalPages, onPageChange }) => {
+const Pagination = ({ currentPage, totalPages, onPageChange }: any) => {
+  if (totalPages <= 1) return null;
   return (
     <div className={styles.pagination}>
-      <button
-        className={styles.paginationBtn}
-        disabled={currentPage === 1}
-        onClick={() => onPageChange(currentPage - 1)}
-      >
+      <button className={styles.paginationBtn} disabled={currentPage === 1} onClick={() => onPageChange(currentPage - 1)}>
         <ChevronLeftIcon />
       </button>
       {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
@@ -540,14 +447,8 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
           {page}
         </button>
       ))}
-      <span className={styles.paginationInfo}>
-        Page {currentPage} sur {totalPages}
-      </span>
-      <button
-        className={styles.paginationBtn}
-        disabled={currentPage === totalPages}
-        onClick={() => onPageChange(currentPage + 1)}
-      >
+      <span className={styles.paginationInfo}>Page {currentPage} sur {totalPages}</span>
+      <button className={styles.paginationBtn} disabled={currentPage === totalPages} onClick={() => onPageChange(currentPage + 1)}>
         <ChevronRightIcon />
       </button>
     </div>
@@ -557,141 +458,96 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
 /* ==========================================
    MAIN COMPONENT
 ========================================== */
+const ITEMS_PER_PAGE = 12;
+
 const AgentMesBiens = () => {
+  const { user } = useAuthContext();
   const [filters, setFilters] = useState({
     search: '',
     type: '',
     status: '',
-    location: '',
     sort: 'recent',
   });
   const [viewMode, setViewMode] = useState('grid');
   const [currentPage, setCurrentPage] = useState(1);
+  const [properties, setProperties] = useState<any[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingProperty, setEditingProperty] = useState<PropertyData | null>(null);
 
-  const handleFilterChange = (key, value) => {
+  const fetchProperties = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const offset = (currentPage - 1) * ITEMS_PER_PAGE;
+    const { data, count } = await getProperties({
+      owner_id: user.id,
+      type: filters.type || undefined,
+      status: filters.status || undefined,
+      search: filters.search || undefined,
+      sort: filters.sort,
+      limit: ITEMS_PER_PAGE,
+      offset,
+    });
+    setProperties(data || []);
+    setTotalCount(count || 0);
+    setLoading(false);
+  }, [user, filters, currentPage]);
+
+  useEffect(() => {
+    fetchProperties();
+  }, [fetchProperties]);
+
+  const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
+    setCurrentPage(1);
   };
 
-  // Mock Data
-  const mockData = {
-    stats: [
-      { icon: 'check', iconStyle: 'primary', value: 8, label: 'Biens actifs' },
-      { icon: 'clock', iconStyle: 'warning', value: 2, label: 'En attente', variant: 'warning' },
-      { icon: 'badge', iconStyle: 'info', value: 2, label: 'Loués ce mois' },
-      { icon: 'warning', iconStyle: 'error', value: 3, label: 'Alertes', variant: 'error' },
-    ],
-    alerts: [
-      { type: 'error', count: '2 mandats', text: 'expirent dans 15 jours' },
-      { type: 'warning', count: '1 bien', text: 'sans visite depuis 14 jours' },
-    ],
-    properties: [
-      {
-        id: 1,
-        type: 'Appartement F3',
-        surface: 85,
-        title: 'Bel appartement lumineux',
-        location: 'Kipé, Ratoma',
-        price: 2500000,
-        status: 'active',
-        isPremium: true,
-        stats: { views: 234, visits: 5, daysOnline: 12 },
-        owner: { initials: 'MD', name: 'M. Mamadou Diallo' },
-      },
-      {
-        id: 2,
-        type: 'Villa F4',
-        surface: 150,
-        title: 'Villa moderne avec jardin',
-        location: 'Lambanyi, Ratoma',
-        price: 4800000,
-        status: 'active',
-        isPremium: false,
-        stats: { views: 89, visits: 2, daysOnline: 8 },
-        owner: { initials: 'AB', name: 'Mme Aissatou Barry' },
-      },
-      {
-        id: 3,
-        type: 'Studio',
-        surface: 35,
-        title: 'Studio centre-ville',
-        location: 'Cosa, Matam',
-        price: 800000,
-        status: 'expiring',
-        expiresIn: '15j',
-        hasAlert: true,
-        isPremium: false,
-        stats: { views: 12, visits: 0, daysOnline: 21 },
-        owner: { initials: 'OD', name: 'M. Oumar Diallo' },
-      },
-      {
-        id: 4,
-        type: 'Appartement F2',
-        surface: 55,
-        title: 'Appart F2 rénové',
-        location: 'Nongo, Ratoma',
-        price: 1200000,
-        status: 'pending',
-        isPremium: false,
-        stats: { views: 45, visits: 1, daysOnline: 3 },
-        owner: { initials: 'FB', name: 'Mme Fatoumata Bah' },
-      },
-      {
-        id: 5,
-        type: 'Villa F5',
-        surface: 200,
-        title: 'Grande villa familiale',
-        location: 'Kipé, Ratoma',
-        price: 6500000,
-        status: 'rented',
-        isPremium: false,
-        stats: { views: 312, visits: 8, daysOnline: 45 },
-        owner: { initials: 'IS', name: 'M. Ibrahima Sow' },
-      },
-      {
-        id: 6,
-        type: 'Duplex F4',
-        surface: 120,
-        title: 'Duplex avec terrasse',
-        location: 'Ratoma Centre',
-        price: 3200000,
-        status: 'active',
-        isPremium: false,
-        stats: { views: 156, visits: 3, daysOnline: 5 },
-        owner: { initials: 'AK', name: 'M. Alpha Keita' },
-      },
-    ],
+  const handleDelete = async (id: string) => {
+    if (!confirm('Supprimer ce bien définitivement ?')) return;
+    await deleteProperty(id);
+    fetchProperties();
   };
+
+  const handleEdit = (property: any) => {
+    setEditingProperty(property as PropertyData);
+    setShowForm(true);
+  };
+
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+
+  // Compute stats from data
+  const availableCount = properties.filter((p) => p.status === 'available').length;
+  const rentedCount = properties.filter((p) => p.status === 'rented').length;
+  const draftCount = properties.filter((p) => p.status === 'draft').length;
+
+  const stats = [
+    { icon: 'check', iconStyle: 'primary', value: totalCount, label: 'Total biens' },
+    { icon: 'check', iconStyle: 'primary', value: availableCount, label: 'Disponibles' },
+    { icon: 'badge', iconStyle: 'info', value: rentedCount, label: 'Loués' },
+    { icon: 'clock', iconStyle: 'warning', value: draftCount, label: 'Brouillons', variant: 'warning' },
+  ];
 
   return (
     <>
-      <TopBar />
+      <TopBar onAddClick={() => { setEditingProperty(null); setShowForm(true); }} />
 
       <div className={styles.pageContent}>
-        {/* Page Header */}
         <div className={styles.pageHeader}>
           <div className={styles.pageHeaderContent}>
             <h1>Mon portefeuille immobilier</h1>
             <p>Gérez vos biens, suivez leurs performances et optimisez vos locations</p>
           </div>
           <div className={styles.pageHeaderActions}>
-            <button className={`${styles.btn} ${styles.btnOutline}`}>
-              <UploadIcon />
-              Exporter
-            </button>
-            <button className={`${styles.btn} ${styles.btnPrimary}`}>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => { setEditingProperty(null); setShowForm(true); }}>
               <PlusIcon />
               Ajouter un bien
             </button>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <StatsGrid stats={mockData.stats} />
+        <StatsGrid stats={stats} />
 
-        {/* Alerts Banner */}
-        <AlertsBanner alerts={mockData.alerts} />
-
-        {/* Filters Bar */}
         <FiltersBar
           filters={filters}
           onFilterChange={handleFilterChange}
@@ -699,20 +555,38 @@ const AgentMesBiens = () => {
           onViewModeChange={setViewMode}
         />
 
-        {/* Properties Grid */}
-        <div className={styles.propertiesGrid}>
-          {mockData.properties.map((property) => (
-            <PropertyCard key={property.id} property={property} />
-          ))}
-        </div>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748B' }}>
+            Chargement des biens...
+          </div>
+        ) : properties.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: '#64748B' }}>
+            <HouseIcon className={styles.emptyIcon} />
+            <p style={{ marginTop: 12, fontSize: '1rem' }}>Aucun bien trouvé</p>
+            <p style={{ fontSize: '0.875rem' }}>Cliquez sur "Ajouter un bien" pour commencer</p>
+          </div>
+        ) : (
+          <div className={styles.propertiesGrid}>
+            {properties.map((property) => (
+              <PropertyCard key={property.id} property={property} onEdit={handleEdit} onDelete={handleDelete} />
+            ))}
+          </div>
+        )}
 
-        {/* Pagination */}
         <Pagination
           currentPage={currentPage}
-          totalPages={2}
+          totalPages={totalPages}
           onPageChange={setCurrentPage}
         />
       </div>
+
+      {showForm && (
+        <PropertyForm
+          editProperty={editingProperty}
+          onClose={() => setShowForm(false)}
+          onSaved={fetchProperties}
+        />
+      )}
     </>
   );
 };
