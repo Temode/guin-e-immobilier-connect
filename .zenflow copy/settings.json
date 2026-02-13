@@ -1,0 +1,5 @@
+{
+  "setup_script": "npm i",
+  "dev_script": "npm run dev",
+  "verification_script": "npm run lint"
+}
