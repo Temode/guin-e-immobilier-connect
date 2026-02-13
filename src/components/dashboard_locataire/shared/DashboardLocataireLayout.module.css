@@ -17,6 +17,19 @@
   min-height: 100vh;
 }
 
+.topBarGlobal {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 12px 24px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(249, 250, 251, 0.85);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--color-neutral-200, #e5e7eb);
+}
+
 /* ==========================================
    SIDEBAR
 ========================================== */

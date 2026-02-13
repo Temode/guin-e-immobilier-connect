@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import styles from './Home.module.css';
 import { usePropertyContext } from '../../context/PropertyContext';
+import { useAuthContext } from '@/context/AuthContext';
+import UserProfileMenu from '../shared/UserProfileMenu';
 import {
   Check,
   ArrowRight,
@@ -166,6 +168,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle 
 
 const Home: React.FC = () => {
   const { state } = usePropertyContext();
+  const { user } = useAuthContext();
 
   // Données des propriétés identiques à SearchProperty
   const [favorites, setFavorites] = useState<number[]>([1, 5]);
@@ -447,12 +450,18 @@ const Home: React.FC = () => {
             <li><a href="#" className={styles.navLink}>Comment ça marche</a></li>
           </ul>
           <div className={styles.navCta}>
-            <Link to="/auth" className={`${styles.btn} ${styles.btnOutline}`}>
-              Connexion
-            </Link>
-            <Link to="/auth" className={`${styles.btn} ${styles.btnPrimary}`}>
-              Inscription Gratuite
-            </Link>
+            {user ? (
+              <UserProfileMenu />
+            ) : (
+              <>
+                <Link to="/auth" className={`${styles.btn} ${styles.btnOutline}`}>
+                  Connexion
+                </Link>
+                <Link to="/auth" className={`${styles.btn} ${styles.btnPrimary}`}>
+                  Inscription Gratuite
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </nav>
