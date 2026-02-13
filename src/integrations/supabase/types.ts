@@ -137,6 +137,93 @@ export type Database = {
         }
         Relationships: []
       }
+      properties: {
+        Row: {
+          address: string | null
+          amenities: Json | null
+          area: number | null
+          bathrooms: number | null
+          bedrooms: number | null
+          city: string
+          commune: string | null
+          country: string | null
+          created_at: string | null
+          currency: string
+          description: string | null
+          furnished: boolean | null
+          id: string
+          images: Json | null
+          latitude: number | null
+          longitude: number | null
+          owner_id: string
+          price: number
+          published_at: string | null
+          quartier: string | null
+          status: string
+          title: string
+          transaction_type: string
+          type: string
+          updated_at: string | null
+          verified: boolean | null
+        }
+        Insert: {
+          address?: string | null
+          amenities?: Json | null
+          area?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          city: string
+          commune?: string | null
+          country?: string | null
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          furnished?: boolean | null
+          id?: string
+          images?: Json | null
+          latitude?: number | null
+          longitude?: number | null
+          owner_id: string
+          price: number
+          published_at?: string | null
+          quartier?: string | null
+          status?: string
+          title: string
+          transaction_type: string
+          type: string
+          updated_at?: string | null
+          verified?: boolean | null
+        }
+        Update: {
+          address?: string | null
+          amenities?: Json | null
+          area?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          city?: string
+          commune?: string | null
+          country?: string | null
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          furnished?: boolean | null
+          id?: string
+          images?: Json | null
+          latitude?: number | null
+          longitude?: number | null
+          owner_id?: string
+          price?: number
+          published_at?: string | null
+          quartier?: string | null
+          status?: string
+          title?: string
+          transaction_type?: string
+          type?: string
+          updated_at?: string | null
+          verified?: boolean | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
