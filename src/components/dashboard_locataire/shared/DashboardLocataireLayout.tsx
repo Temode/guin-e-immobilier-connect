@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import UserProfileMenu from '../../shared/UserProfileMenu';
 import styles from './DashboardLocataireLayout.module.css';
 import { useAuthContext } from '@/context/AuthContext';
 
@@ -16,6 +17,9 @@ const DashboardLocataireLayout = () => {
     <div className={styles.appLayout}>
       <Sidebar user={sidebarUser} />
       <div className={styles.mainWrapper}>
+        <div className={styles.topBarGlobal}>
+          <UserProfileMenu />
+        </div>
         <Outlet />
       </div>
     </div>

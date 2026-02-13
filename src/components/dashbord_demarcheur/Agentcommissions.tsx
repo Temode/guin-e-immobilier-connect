@@ -4,279 +4,137 @@ import styles from './AgentCommissions.module.css';
 /* ==========================================
    ICONS COMPONENTS
 ========================================== */
-const HomeIcon = ({ className }) => (
+const HomeIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
   </svg>
 );
 
-const DashboardIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-  </svg>
-);
-
-const BuildingIcon = ({ className }) => (
+const BuildingIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
   </svg>
 );
 
-const UsersIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
-);
-
-const CalendarIcon = ({ className }) => (
+const CalendarIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
   </svg>
 );
 
-const MessageIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-  </svg>
-);
-
-const CurrencyIcon = ({ className }) => (
+const CurrencyIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
 
-const SettingsIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
-);
-
-const DownloadIcon = ({ className }) => (
+const DownloadIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
   </svg>
 );
 
-const HelpIcon = ({ className }) => (
+const HelpIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
 
-const AlertIcon = ({ className }) => (
+const AlertIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
   </svg>
 );
 
-const CreditCardIcon = ({ className }) => (
+const CreditCardIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
   </svg>
 );
 
-const BadgeCheckIcon = ({ className }) => (
+const BadgeCheckIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
     <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
   </svg>
 );
 
-const StarIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-  </svg>
-);
-
-const SparklesIcon = ({ className }) => (
+const SparklesIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
     <path fillRule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5z" clipRule="evenodd" />
   </svg>
 );
 
-const PlusIcon = ({ className }) => (
+const PlusIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
   </svg>
 );
 
-const ArrowUpIcon = ({ className }) => (
+const ArrowUpIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
   </svg>
 );
 
-const ArrowDownIcon = ({ className }) => (
+const ArrowDownIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
   </svg>
 );
 
-const ChartIcon = ({ className }) => (
+const ChartIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
   </svg>
 );
 
-const ClockIcon = ({ className }) => (
+const ClockIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
 
-const ExclamationIcon = ({ className }) => (
+const ExclamationIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
 
-const CheckIcon = ({ className }) => (
+const CheckIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
   </svg>
 );
 
-const XIcon = ({ className }) => (
+const XIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
   </svg>
 );
 
-const ChevronRightIcon = ({ className }) => (
+const ChevronRightIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
   </svg>
 );
 
-const PhoneIcon = ({ className }) => (
+const PhoneIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
   </svg>
 );
 
-const RefreshIcon = ({ className }) => (
+const RefreshIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
   </svg>
 );
 
-const ClipboardIcon = ({ className }) => (
+const ClipboardIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
   </svg>
 );
-
-/* ==========================================
-   SIDEBAR COMPONENT
-========================================== */
-const Sidebar = ({ agent }) => {
-  const navSections = [
-    {
-      title: 'Menu principal',
-      items: [
-        { icon: DashboardIcon, label: 'Tableau de bord', href: '#' },
-        { icon: BuildingIcon, label: 'Mes biens', badge: 12, badgeGold: true },
-        { icon: UsersIcon, label: 'Mes clients', badge: 47 },
-        { icon: CalendarIcon, label: 'Agenda & Visites', badge: 3 },
-      ],
-    },
-    {
-      title: 'Communication',
-      items: [
-        { icon: MessageIcon, label: 'Messages', badge: 8, badgeUrgent: true },
-      ],
-    },
-    {
-      title: 'Finances',
-      items: [
-        { icon: CurrencyIcon, label: 'Mes commissions', active: true, badge: '+850K', badgeGold: true },
-      ],
-    },
-    {
-      title: 'Compte',
-      items: [
-        { icon: SettingsIcon, label: 'Paramètres & Profil' },
-      ],
-    },
-  ];
-
-  return (
-    <aside className={styles.sidebar}>
-      <div className={styles.sidebarHeader}>
-        <a href="#" className={styles.logo}>
-          <div className={styles.logoIcon}>
-            <HomeIcon />
-          </div>
-          <span className={styles.logoText}>
-            Immo<span>GN</span>
-          </span>
-        </a>
-      </div>
-
-      <div className={styles.agentProfileCard}>
-        <div className={styles.agentProfileHeader}>
-          <div className={styles.agentAvatar}>{agent.initials}</div>
-          <div className={styles.agentInfo}>
-            <h4 className={styles.agentName}>{agent.name}</h4>
-            <span className={styles.agentCertifiedBadge}>
-              <StarIcon />
-              Agent Certifié
-            </span>
-          </div>
-        </div>
-        <div className={styles.agentStats}>
-          <div className={styles.agentStat}>
-            <div className={styles.agentStatValue}>
-              4.8 <StarIcon />
-            </div>
-            <div className={styles.agentStatLabel}>47 avis</div>
-          </div>
-          <div className={styles.agentStat}>
-            <div className={styles.agentStatValue}>89%</div>
-            <div className={styles.agentStatLabel}>Taux réponse</div>
-          </div>
-        </div>
-      </div>
-
-      <nav className={styles.sidebarNav}>
-        {navSections.map((section, sectionIndex) => (
-          <div key={sectionIndex} className={styles.navSection}>
-            <span className={styles.navSectionTitle}>{section.title}</span>
-            {section.items.map((item, itemIndex) => (
-              <a
-                key={itemIndex}
-                href={item.href || '#'}
-                className={`${styles.navItem} ${item.active ? styles.active : ''}`}
-              >
-                <item.icon />
-                {item.label}
-                {item.badge && (
-                  <span className={`${styles.badge} ${item.badgeUrgent ? styles.urgent : ''} ${item.badgeGold ? styles.gold : ''}`}>
-                    {item.badge}
-                  </span>
-                )}
-              </a>
-            ))}
-          </div>
-        ))}
-      </nav>
-
-      <div className={styles.sidebarFooter}>
-        <div className={styles.premiumCard}>
-          <div className={styles.premiumCardIcon}>
-            <SparklesIcon />
-          </div>
-          <h4>Passez Pro</h4>
-          <p>Commission réduite à 3-4%</p>
-          <button className={`${styles.btn} ${styles.btnGold} ${styles.btnSm}`}>
-            Voir les avantages
-          </button>
-        </div>
-      </div>
-    </aside>
-  );
-};
 
 /* ==========================================
    TOP BAR COMPONENT
@@ -658,10 +516,6 @@ const AgentCommissions = () => {
 
   // Mock Data
   const mockData = {
-    agent: {
-      name: 'Abdoulaye Diallo',
-      initials: 'AD',
-    },
     balance: {
       amount: '3,450,000 GNF',
       plan: 'Plan Basic • 5% commission',
@@ -775,47 +629,43 @@ const AgentCommissions = () => {
   };
 
   return (
-    <div className={styles.appLayout}>
-      <Sidebar agent={mockData.agent} />
+    <>
+      <TopBar />
 
-      <main className={styles.mainContent}>
-        <TopBar />
+      <div className={styles.pageContent}>
+        <AlertBanner
+          title={mockData.alert.title}
+          message={mockData.alert.message}
+          onAction={() => console.log('View problem')}
+        />
 
-        <div className={styles.pageContent}>
-          <AlertBanner
-            title={mockData.alert.title}
-            message={mockData.alert.message}
-            onAction={() => console.log('View problem')}
+        <BalanceHero
+          balance={mockData.balance.amount}
+          plan={mockData.balance.plan}
+          simulation={mockData.balance.simulation}
+          onWithdraw={() => setIsModalOpen(true)}
+          onUpgrade={() => console.log('Upgrade')}
+        />
+
+        <StatsGrid stats={mockData.stats} />
+
+        <div className={styles.contentGrid}>
+          <PaymentsSection payments={mockData.payments} />
+          <TransactionHistory
+            transactions={mockData.transactions}
+            filters={mockData.filters}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
           />
-
-          <BalanceHero
-            balance={mockData.balance.amount}
-            plan={mockData.balance.plan}
-            simulation={mockData.balance.simulation}
-            onWithdraw={() => setIsModalOpen(true)}
-            onUpgrade={() => console.log('Upgrade')}
-          />
-
-          <StatsGrid stats={mockData.stats} />
-
-          <div className={styles.contentGrid}>
-            <PaymentsSection payments={mockData.payments} />
-            <TransactionHistory
-              transactions={mockData.transactions}
-              filters={mockData.filters}
-              activeFilter={activeFilter}
-              onFilterChange={setActiveFilter}
-            />
-          </div>
         </div>
-      </main>
+      </div>
 
       <WithdrawalModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         balance={mockData.balance.amount}
       />
-    </div>
+    </>
   );
 };
 
