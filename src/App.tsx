@@ -23,6 +23,7 @@ import AgentClients from './components/dashbord_demarcheur/Agentclients';
 import AgentMessages from './components/dashbord_demarcheur/Agentmessages';
 import AgentCommissions from './components/dashbord_demarcheur/Agentcommissions';
 import AgentSettings from './components/dashbord_demarcheur/Agentsettings';
+import PropertyDetail from './pages/PropertyDetail';
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="/auth" element={<SocialAuthPage />} />
             <Route path="/auth/email" element={<EmailAuthPage />} />
             <Route path="/user-role" element={<UserRoleSelection />} />
+            <Route path="/property/:id" element={<PropertyDetail />} />
             
             <Route path="/dashbord-agent" element={
               <ProtectedRoute>
