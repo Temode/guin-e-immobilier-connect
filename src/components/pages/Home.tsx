@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import styles from './Home.module.css';
 import { usePropertyContext } from '../../context/PropertyContext';
 import { useAuthContext } from '@/context/AuthContext';
@@ -65,6 +65,7 @@ interface PropertyAgent {
 
 interface Property {
   id: number;
+  dbId?: string;
   image: string;
   title: string;
   price: number;
@@ -83,6 +84,7 @@ interface PropertyCardProps {
 }
 
 const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle }) => {
+  const navigate = useNavigate();
   const featureIcons: Record<string, React.FC<{ className?: string }>> = {
     rooms: HomeIcon,
     area: Maximize2,
@@ -98,8 +100,14 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle 
     return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
   };
 
+  const handleClick = () => {
+    if (property.dbId) {
+      navigate(`/property/${property.dbId}`);
+    }
+  };
+
   return (
-    <article className={`${styles.propertyCard} ${property.premium ? styles.premium : ''}`}>
+    <article className={`${styles.propertyCard} ${property.premium ? styles.premium : ''}`} onClick={handleClick} style={property.dbId ? { cursor: 'pointer' } : {}}>
       <div className={styles.propertyImage}>
         <img src={property.image} alt={property.title} />
         {property.badges && property.badges.length > 0 && (
@@ -169,11 +177,57 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property, onFavoriteToggle 
 const Home: React.FC = () => {
   const { state } = usePropertyContext();
   const { user } = useAuthContext();
+  const navigate = useNavigate();
 
-  // Données des propriétés identiques à SearchProperty
-  const [favorites, setFavorites] = useState<number[]>([1, 5]);
+  const [favorites, setFavorites] = useState<number[]>([]);
+  const [featuredProperties, setFeaturedProperties] = useState<Property[]>([]);
+  const [loadingProperties, setLoadingProperties] = useState(true);
 
-  const properties: Property[] = [
+  // Fetch featured properties from Supabase
+  useEffect(() => {
+    (async () => {
+      try {
+        const { getProperties } = await import('@/services/propertyService');
+        const { data } = await getProperties({ status: 'available', limit: 6 });
+        if (data && data.length > 0) {
+          const mapped: Property[] = data.map((p: any, idx: number) => {
+            const images = (p.images as string[]) || [];
+            const amenities = (p.amenities as string[]) || [];
+            const features: PropertyFeature[] = [];
+            if (p.bedrooms) features.push({ type: 'rooms', label: `${p.bedrooms} pièce${p.bedrooms > 1 ? 's' : ''}` });
+            if (p.area) features.push({ type: 'area', label: `${p.area} m²` });
+            if (amenities.includes('Climatisation')) features.push({ type: 'ac', label: 'Climatisé' });
+            if (amenities.includes('Générateur')) features.push({ type: 'generator', label: 'Groupe élec.' });
+            if (amenities.includes('Parking')) features.push({ type: 'parking', label: 'Parking' });
+            if (p.furnished) features.push({ type: 'furnished', label: 'Meublé' });
+
+            return {
+              id: idx + 1,
+              dbId: p.id,
+              image: images[0] || 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600&h=400&fit=crop',
+              title: p.title,
+              price: p.price,
+              location: [p.quartier, p.commune, p.city].filter(Boolean).join(', '),
+              photosCount: images.length,
+              premium: false,
+              badges: p.verified ? [{ type: 'verified' as const, label: 'Vérifié' }] : [],
+              features: features.slice(0, 3),
+              agent: { name: 'Agent', initials: 'AG', verified: true },
+              isFavorite: false,
+            };
+          });
+          setFeaturedProperties(mapped);
+        }
+      } catch (err) {
+        console.error('Error fetching featured properties:', err);
+      } finally {
+        setLoadingProperties(false);
+      }
+    })();
+  }, []);
+
+  // Fallback to mock data if no real data
+  const properties: Property[] = featuredProperties.length > 0 ? featuredProperties : [
     {
       id: 1,
       image: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=600&h=400&fit=crop',
@@ -670,10 +724,10 @@ const Home: React.FC = () => {
           </div>
 
           <div style={{ textAlign: 'center', marginTop: 'var(--space-12)' }}>
-            <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnLg}`}>
+            <Link to="/dashboard-locataire/recherche" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnLg}`}>
               Voir Tous les Biens
               <ArrowRight className={styles.arrowIcon} />
-            </button>
+            </Link>
           </div>
         </div>
       </section>
