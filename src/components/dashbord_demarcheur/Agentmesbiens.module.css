@@ -1,9 +1,145 @@
 /* ==========================================
+   CSS VARIABLES
+========================================== */
+:root {
+  --color-primary-50: #F0FDF4;
+  --color-primary-100: #DCFCE7;
+  --color-primary-200: #BBF7D0;
+  --color-primary-300: #86EFAC;
+  --color-primary-400: #4ADE80;
+  --color-primary-500: #10B981;
+  --color-primary-600: #047857;
+  --color-primary-700: #065F46;
+
+  --color-secondary-50: #FFFBEB;
+  --color-secondary-100: #FEF3C7;
+  --color-secondary-200: #FDE68A;
+  --color-secondary-300: #FCD34D;
+  --color-secondary-400: #FBBF24;
+  --color-secondary-500: #F59E0B;
+  --color-secondary-600: #D97706;
+  --color-secondary-700: #B45309;
+
+  --color-neutral-50: #F8FAFC;
+  --color-neutral-100: #F1F5F9;
+  --color-neutral-200: #E2E8F0;
+  --color-neutral-300: #CBD5E1;
+  --color-neutral-400: #94A3B8;
+  --color-neutral-500: #64748B;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1E293B;
+  --color-neutral-900: #0F172A;
+
+  --color-success-500: #22C55E;
+  --color-success-600: #16A34A;
+
+  --color-error-50: #FEF2F2;
+  --color-error-100: #FEE2E2;
+  --color-error-200: #FECACA;
+  --color-error-300: #FCA5A5;
+  --color-error-400: #F87171;
+  --color-error-500: #EF4444;
+  --color-error-600: #DC2626;
+
+  --color-warning-50: #FFFBEB;
+  --color-warning-100: #FEF3C7;
+  --color-warning-200: #FDE68A;
+  --color-warning-300: #FCD34D;
+  --color-warning-500: #F59E0B;
+  --color-warning-600: #D97706;
+
+  --color-info-50: #EFF6FF;
+  --color-info-100: #DBEAFE;
+  --color-info-500: #3B82F6;
+  --color-info-600: #2563EB;
+
+  --font-display: 'Poppins', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+  --shadow-gold: 0 4px 14px -2px rgba(245, 158, 11, 0.35);
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  --transition-fast: 150ms ease-in-out;
+  --transition-base: 250ms ease-in-out;
+
+  --topbar-height: 72px;
+}
+
+/* ==========================================
+   BUTTONS
+========================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--radius-lg);
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: var(--transition-fast);
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+
+.btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btnSm {
+  padding: 8px 16px;
+  font-size: 0.813rem;
+}
+
+.btnPrimary {
+  background: var(--color-primary-600);
+  color: white;
+}
+
+.btnPrimary:hover {
+  background: var(--color-primary-700);
+}
+
+.btnGold {
+  background: linear-gradient(135deg, var(--color-secondary-500), var(--color-secondary-600));
+  color: white;
+  box-shadow: var(--shadow-gold);
+}
+
+.btnGold:hover {
+  background: linear-gradient(135deg, var(--color-secondary-600), var(--color-secondary-700));
+}
+
+.btnSecondary {
+  background: white;
+  color: var(--color-neutral-700);
+  border: 1px solid var(--color-neutral-200);
+}
+
+.btnSecondary:hover {
+  background: var(--color-neutral-50);
+  border-color: var(--color-neutral-300);
+}
+
+/* ==========================================
    TOP BAR
 ========================================== */
 .topBar {
   height: var(--topbar-height);
-  background: var(--color-white);
+  background: white;
   border-bottom: 1px solid var(--color-neutral-200);
   padding: 0 32px;
   display: flex;
@@ -84,7 +220,7 @@
 .searchBox input:focus {
   outline: none;
   border-color: var(--color-primary-500);
-  background: var(--color-white);
+  background: white;
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
@@ -103,7 +239,7 @@
   height: 42px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-neutral-200);
-  background: var(--color-white);
+  background: white;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -138,7 +274,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--color-white);
+  border: 2px solid white;
 }
 
 /* ==========================================
@@ -149,9 +285,7 @@
   padding: 24px 32px 32px;
 }
 
-/* ==========================================
-   PAGE HEADER
-========================================== */
+/* Page Header */
 .pageHeader {
   display: flex;
   align-items: flex-start;
@@ -231,7 +365,7 @@
 }
 
 .statCard {
-  background: var(--color-white);
+  background: white;
   border: 1px solid var(--color-neutral-200);
   border-radius: var(--radius-xl);
   padding: 20px;
@@ -356,11 +490,6 @@
   color: var(--color-neutral-700);
 }
 
-.alertsBannerItem strong {
-  font-weight: 600;
-  color: var(--color-neutral-800);
-}
-
 .dot {
   width: 8px;
   height: 8px;
@@ -373,6 +502,11 @@
 
 .dot.warning {
   background: var(--color-warning-500);
+}
+
+.alertsBannerItem strong {
+  font-weight: 600;
+  color: var(--color-neutral-800);
 }
 
 /* ==========================================
@@ -409,7 +543,7 @@
   border: 2px solid var(--color-neutral-200);
   border-radius: var(--radius-xl);
   font-size: 0.875rem;
-  background: var(--color-white);
+  background: white;
   transition: var(--transition-fast);
 }
 
@@ -501,9 +635,7 @@
   margin-bottom: 32px;
 }
 
-/* ==========================================
-   PROPERTY CARD
-========================================== */
+/* Property Card */
 .propertyCard {
   background: white;
   border: 1px solid var(--color-neutral-200);
@@ -529,47 +661,12 @@
   border-color: var(--color-error-300);
 }
 
-.propertyCard:nth-child(1) {
-  animation-delay: 0.05s;
-}
-
-.propertyCard:nth-child(2) {
-  animation-delay: 0.1s;
-}
-
-.propertyCard:nth-child(3) {
-  animation-delay: 0.15s;
-}
-
-.propertyCard:nth-child(4) {
-  animation-delay: 0.2s;
-}
-
-.propertyCard:nth-child(5) {
-  animation-delay: 0.25s;
-}
-
-.propertyCard:nth-child(6) {
-  animation-delay: 0.3s;
-}
-
 /* Property Image */
 .propertyImage {
   position: relative;
   height: 200px;
   background: var(--color-neutral-100);
   overflow: hidden;
-}
-
-.propertyImage img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: var(--transition-base);
-}
-
-.propertyCard:hover .propertyImage img {
-  transform: scale(1.05);
 }
 
 .propertyImagePlaceholder {
@@ -587,6 +684,7 @@
   color: var(--color-neutral-300);
 }
 
+/* Property Badges */
 .propertyBadges {
   position: absolute;
   top: 12px;
@@ -613,37 +711,22 @@
   height: 12px;
 }
 
-.propertyBadge.active {
+.badgeActive {
   background: var(--color-success-500);
   color: white;
 }
 
-.propertyBadge.pending {
+.badgePending {
   background: var(--color-warning-500);
   color: white;
 }
 
-.propertyBadge.rented {
+.badgeRented {
   background: var(--color-info-500);
   color: white;
 }
 
-.propertyBadge.inactive {
-  background: var(--color-neutral-500);
-  color: white;
-}
-
-.propertyBadge.new {
-  background: var(--color-secondary-500);
-  color: white;
-}
-
-.propertyBadge.verified {
-  background: var(--color-primary-500);
-  color: white;
-}
-
-.propertyBadge.expiring {
+.badgeExpiring {
   background: var(--color-error-500);
   color: white;
   animation: pulseBadge 2s infinite;
@@ -654,12 +737,17 @@
   50% { opacity: 0.7; }
 }
 
-.propertyBadge.premium {
+.badgePremium {
   background: linear-gradient(135deg, var(--color-secondary-400), var(--color-secondary-600));
   color: white;
 }
 
-/* Property Menu Overlay */
+.badgeNew {
+  background: var(--color-secondary-500);
+  color: white;
+}
+
+/* Property Menu */
 .propertyMenuOverlay {
   position: absolute;
   top: 12px;
@@ -704,6 +792,17 @@
   box-shadow: var(--shadow-lg);
   padding: 6px;
   z-index: 100;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition: var(--transition-fast);
+}
+
+.propertyMenuBtn:hover .dropdownMenu,
+.dropdownMenu:hover {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 .dropdownItem {
@@ -758,7 +857,7 @@
   margin: 6px 0;
 }
 
-/* Property Photos Count */
+/* Photos Count */
 .propertyPhotosCount {
   position: absolute;
   bottom: 12px;
@@ -824,6 +923,7 @@
   flex-shrink: 0;
 }
 
+/* Property Features */
 .propertyFeatures {
   display: flex;
   gap: 16px;
@@ -957,7 +1057,7 @@
   font-weight: 500;
 }
 
-.paginationBtn:hover {
+.paginationBtn:hover:not(:disabled) {
   border-color: var(--color-neutral-300);
   background: var(--color-neutral-50);
 }
@@ -976,54 +1076,6 @@
 .paginationBtn svg {
   width: 18px;
   height: 18px;
-}
-
-/* ==========================================
-   BUTTONS (shared)
-========================================== */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 18px;
-  border-radius: var(--radius-lg);
-  font-weight: 600;
-  font-size: 0.875rem;
-  transition: var(--transition-fast);
-  border: none;
-  cursor: pointer;
-  font-family: var(--font-body);
-}
-
-.btn svg {
-  width: 18px;
-  height: 18px;
-}
-
-.btnSm {
-  padding: 8px 16px;
-  font-size: 0.813rem;
-}
-
-.btnPrimary {
-  background: var(--color-primary-600);
-  color: white;
-}
-
-.btnPrimary:hover {
-  background: var(--color-primary-700);
-}
-
-.btnSecondary {
-  background: white;
-  color: var(--color-neutral-700);
-  border: 1px solid var(--color-neutral-200);
-}
-
-.btnSecondary:hover {
-  background: var(--color-neutral-50);
-  border-color: var(--color-neutral-300);
 }
 
 /* ==========================================
@@ -1079,5 +1131,18 @@
   .alertsBannerContent {
     flex-direction: column;
     gap: 8px;
+  }
+
+  .filtersBar {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .filtersLeft {
+    flex-wrap: wrap;
+  }
+
+  .filterSearch {
+    max-width: 100%;
   }
 }
