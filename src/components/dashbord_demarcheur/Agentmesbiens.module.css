@@ -669,6 +669,12 @@
   overflow: hidden;
 }
 
+.propertyImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .propertyImagePlaceholder {
   width: 100%;
   height: 100%;
@@ -747,6 +753,16 @@
   color: white;
 }
 
+.badgeDraft {
+  background: var(--color-neutral-500);
+  color: white;
+}
+
+.badgeSold {
+  background: var(--color-neutral-700);
+  color: white;
+}
+
 /* Property Menu */
 .propertyMenuOverlay {
   position: absolute;
@@ -798,8 +814,7 @@
   transition: var(--transition-fast);
 }
 
-.propertyMenuBtn:hover .dropdownMenu,
-.dropdownMenu:hover {
+.dropdownMenu.open {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
@@ -1030,6 +1045,40 @@
 
 .propertyActionBtn.gold:hover {
   background: linear-gradient(135deg, var(--color-secondary-600), var(--color-secondary-700));
+}
+
+/* ==========================================
+   LOADING & EMPTY STATES
+========================================== */
+.loadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--color-neutral-500);
+  gap: 12px;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--color-neutral-500);
+  gap: 16px;
+}
+
+.emptyState svg {
+  width: 64px;
+  height: 64px;
+  color: var(--color-neutral-300);
+}
+
+.emptyState p {
+  font-size: 1rem;
+  color: var(--color-neutral-600);
 }
 
 /* ==========================================
