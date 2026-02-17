@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuthContext } from '@/context/AuthContext';
+import { getProperties } from '@/services/propertyService';
+import { getAgentRentals } from '@/services/rentalService';
 import styles from './AgentDashboard.module.css';
 
 /* ==========================================
@@ -122,7 +126,7 @@ const DocumentChartIcon = ({ className }: { className?: string }) => (
 /* ==========================================
    TOP BAR COMPONENT
 ========================================== */
-const TopBar = ({ date, weather, onAddProperty }) => {
+const TopBar = ({ date, weather, onAddProperty }: { date: string; weather: string; onAddProperty: () => void }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   return (
@@ -165,7 +169,8 @@ const TopBar = ({ date, weather, onAddProperty }) => {
 /* ==========================================
    ALERT BANNER COMPONENT
 ========================================== */
-const AlertBanner = ({ alert }) => {
+const AlertBanner = ({ alert }: { alert: { title: string; text: string; time: string } | null }) => {
+  if (!alert) return null;
   return (
     <div className={styles.alertBanner}>
       <div className={styles.alertBannerIcon}>
@@ -179,14 +184,6 @@ const AlertBanner = ({ alert }) => {
         <ClockIcon />
         {alert.time}
       </div>
-      <div className={styles.alertBannerActions}>
-        <button className={`${styles.btn} ${styles.btnOutline} ${styles.btnSm}`}>
-          Voir détails
-        </button>
-        <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSm}`}>
-          Appeler le client
-        </button>
-      </div>
     </div>
   );
 };
@@ -194,8 +191,8 @@ const AlertBanner = ({ alert }) => {
 /* ==========================================
    KPI CARD COMPONENT
 ========================================== */
-const KpiCard = ({ kpi, staggerIndex }) => {
-  const icons = {
+const KpiCard = ({ kpi, staggerIndex }: { kpi: any; staggerIndex: number }) => {
+  const icons: Record<string, any> = {
     building: BuildingIcon,
     calendar: CalendarIcon,
     users: UsersIcon,
@@ -212,79 +209,47 @@ const KpiCard = ({ kpi, staggerIndex }) => {
         <div className={`${styles.kpiIcon} ${styles[kpi.iconStyle]}`}>
           <IconComponent />
         </div>
-        <span className={`${styles.kpiTrend} ${styles.up}`}>
-          <TrendUpIcon />
-          {kpi.trend}
-        </span>
+        {kpi.trend && (
+          <span className={`${styles.kpiTrend} ${styles.up}`}>
+            <TrendUpIcon />
+            {kpi.trend}
+          </span>
+        )}
       </div>
       <p className={styles.kpiValue}>
         {kpi.value}
         {kpi.suffix && <span className={styles.suffix}>{kpi.suffix}</span>}
       </p>
       <p className={styles.kpiLabel}>{kpi.label}</p>
-      <div className={styles.kpiFooter} dangerouslySetInnerHTML={{ __html: kpi.footer }} />
+      {kpi.footer && <div className={styles.kpiFooter} dangerouslySetInnerHTML={{ __html: kpi.footer }} />}
     </div>
-  );
-};
-
-/* ==========================================
-   AGENDA SECTION COMPONENT
-========================================== */
-const AgendaSection = ({ items }) => {
-  return (
-    <section className={`${styles.card} ${styles.agendaSection}`}>
-      <div className={styles.cardHeader}>
-        <h2 className={styles.cardTitle}>
-          Agenda du jour <span className={styles.cardTitleBadge}>{items.length} RDV</span>
-        </h2>
-        <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnSm}`}>Voir tout</button>
-      </div>
-      <div className={styles.cardContent}>
-        <div className={styles.agendaTimeline}>
-          {items.map((item, index) => (
-            <div key={index} className={`${styles.agendaItem} ${styles[item.status]}`}>
-              <div className={styles.agendaTime}>
-                <span>{item.time}</span>
-              </div>
-              <div className={styles.agendaDot}></div>
-              <div className={styles.agendaCard}>
-                <div className={styles.agendaCardHeader}>
-                  <span className={styles.agendaCardType}>{item.type}</span>
-                  <span className={styles.agendaCardStatus}>{item.statusLabel}</span>
-                </div>
-                <p className={styles.agendaCardTitle}>{item.title}</p>
-                <p className={styles.agendaCardMeta}>
-                  <UserIcon />
-                  {item.client}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
   );
 };
 
 /* ==========================================
    ACTIVITY SECTION COMPONENT
 ========================================== */
-const ActivitySection = ({ activities }) => {
-  const icons = {
+const ActivitySection = ({ activities }: { activities: any[] }) => {
+  const icons: Record<string, any> = {
     contract: CheckCircleIcon,
     visit: CalendarIcon,
     lead: UserPlusIcon,
     message: MessageIcon,
+    property: BuildingIcon,
   };
 
   return (
     <section className={`${styles.card} ${styles.activitySection}`}>
       <div className={styles.cardHeader}>
         <h2 className={styles.cardTitle}>Activité récente</h2>
-        <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnSm}`}>Voir tout</button>
       </div>
       <div className={styles.cardContent}>
         <div className={styles.activityList}>
+          {activities.length === 0 && (
+            <p style={{ color: 'var(--color-neutral-500)', textAlign: 'center', padding: '2rem' }}>
+              Aucune activité récente
+            </p>
+          )}
           {activities.map((activity, index) => {
             const IconComponent = icons[activity.type] || CheckCircleIcon;
             return (
@@ -310,156 +275,21 @@ const ActivitySection = ({ activities }) => {
 };
 
 /* ==========================================
-   PERFORMANCE SECTION COMPONENT
-========================================== */
-const PerformanceSection = ({ data }) => {
-  const [activeTab, setActiveTab] = useState('30j');
-  const tabs = ['7j', '30j', '3m'];
-
-  return (
-    <section className={`${styles.card} ${styles.performanceSection}`}>
-      <div className={styles.cardHeader}>
-        <h2 className={styles.cardTitle}>Performance mensuelle</h2>
-        <div className={styles.tabPills}>
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              className={`${styles.tabPill} ${activeTab === tab ? styles.active : ''}`}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className={styles.cardContent}>
-        <div className={styles.chartHeader}>
-          <div className={styles.chartLegend}>
-            <div className={styles.chartLegendItem}>
-              <span className={`${styles.chartLegendDot} ${styles.primary}`}></span>
-              Visites
-            </div>
-            <div className={styles.chartLegendItem}>
-              <span className={`${styles.chartLegendDot} ${styles.gold}`}></span>
-              Contrats signés
-            </div>
-          </div>
-        </div>
-        <div className={styles.chartContainer}>
-          {data.weeks.map((week, index) => (
-            <div key={index} className={styles.chartBarGroup}>
-              <div className={styles.chartBars}>
-                <div
-                  className={`${styles.chartBar} ${styles.primary}`}
-                  style={{ height: `${week.visits}%` }}
-                ></div>
-                <div
-                  className={`${styles.chartBar} ${styles.gold}`}
-                  style={{ height: `${week.contracts}%` }}
-                ></div>
-              </div>
-              <span className={styles.chartBarLabel}>{week.label}</span>
-            </div>
-          ))}
-        </div>
-        <div className={styles.chartSummary}>
-          <div className={styles.chartSummaryItem}>
-            <p className={styles.chartSummaryValue}>{data.summary.visits}</p>
-            <p className={styles.chartSummaryLabel}>Visites effectuées</p>
-          </div>
-          <div className={styles.chartSummaryItem}>
-            <p className={styles.chartSummaryValue}>{data.summary.contracts}</p>
-            <p className={styles.chartSummaryLabel}>Contrats signés</p>
-          </div>
-          <div className={styles.chartSummaryItem}>
-            <p className={`${styles.chartSummaryValue} ${styles.gold}`}>
-              {data.summary.conversionRate}%
-            </p>
-            <p className={styles.chartSummaryLabel}>Taux conversion</p>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
-/* ==========================================
-   OBJECTIVES SECTION COMPONENT
-========================================== */
-const ObjectivesSection = ({ objectives, month }) => {
-  const icons = {
-    locations: CheckCircleIcon,
-    commissions: CurrencyIcon,
-    clients: UserPlusIcon,
-    visits: EyeIcon,
-  };
-
-  return (
-    <section className={`${styles.card} ${styles.objectivesSection}`}>
-      <div className={styles.cardHeader}>
-        <h2 className={styles.cardTitle}>
-          Objectifs du mois <span className={`${styles.cardTitleBadge} ${styles.gold}`}>{month}</span>
-        </h2>
-      </div>
-      <div className={styles.cardContent}>
-        <div className={styles.objectiveList}>
-          {objectives.map((obj, index) => {
-            const IconComponent = icons[obj.type] || CheckCircleIcon;
-            return (
-              <div
-                key={index}
-                className={`${styles.objectiveItem} ${obj.style ? styles[obj.style] : ''}`}
-              >
-                <div className={styles.objectiveHeader}>
-                  <span className={styles.objectiveLabel}>
-                    <IconComponent />
-                    {obj.label}
-                  </span>
-                  <span className={styles.objectiveValue}>{obj.value}</span>
-                </div>
-                <div className={styles.progressBar}>
-                  <div
-                    className={`${styles.progressFill} ${styles[obj.fillStyle]}`}
-                    style={{ width: `${obj.percentage}%` }}
-                  ></div>
-                </div>
-                <div className={styles.objectiveMeta}>
-                  {obj.completed ? (
-                    <span className={styles.success}>
-                      <CheckCircleFilledIcon />
-                      Objectif atteint !
-                    </span>
-                  ) : (
-                    <span>{obj.percentage}% atteint</span>
-                  )}
-                  <span>{obj.remaining}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-};
-
-/* ==========================================
    ALERTS SECTION COMPONENT
 ========================================== */
-const AlertsSection = ({ alerts }) => {
-  const icons = {
+const AlertsSection = ({ alerts }: { alerts: any[] }) => {
+  const icons: Record<string, any> = {
     warning: ClockIcon,
     error: WarningIcon,
     info: InfoIcon,
   };
 
+  if (alerts.length === 0) return null;
+
   return (
     <section className={`${styles.card} ${styles.alertsSection}`}>
       <div className={styles.cardHeader}>
         <h2 className={styles.cardTitle}>Biens nécessitant attention</h2>
-        <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnSm}`}>
-          Voir tous les biens
-        </button>
       </div>
       <div className={styles.cardContent}>
         <div className={styles.alertsGrid}>
@@ -486,21 +316,22 @@ const AlertsSection = ({ alerts }) => {
 /* ==========================================
    QUICK ACTIONS SECTION COMPONENT
 ========================================== */
-const QuickActionsSection = ({ actions }) => {
-  const icons = {
-    plus: PlusIcon,
-    calendar: CalendarIcon,
-    userPlus: UserPlusIcon,
-    document: DocumentChartIcon,
-  };
+const QuickActionsSection = ({ onAddProperty }: { onAddProperty: () => void }) => {
+  const navigate = useNavigate();
+  const actions = [
+    { icon: PlusIcon, iconStyle: 'primary', title: 'Ajouter un bien', description: 'Publier une nouvelle annonce', onClick: onAddProperty },
+    { icon: CalendarIcon, iconStyle: 'gold', title: 'Mon agenda', description: 'Voir mes rendez-vous', onClick: () => navigate('/dashbord-agent/agenda') },
+    { icon: UsersIcon, iconStyle: 'neutral', title: 'Mes clients', description: 'Gérer mes locataires', onClick: () => navigate('/dashbord-agent/mes-clients') },
+    { icon: MessageIcon, iconStyle: 'primary', title: 'Messages', description: 'Voir mes conversations', onClick: () => navigate('/dashbord-agent/messages') },
+  ];
 
   return (
     <section className={styles.quickActionsSection}>
       <div className={styles.quickActionsGrid}>
         {actions.map((action, index) => {
-          const IconComponent = icons[action.icon] || PlusIcon;
+          const IconComponent = action.icon;
           return (
-            <a key={index} href="#" className={styles.quickActionCard}>
+            <button key={index} className={styles.quickActionCard} onClick={action.onClick}>
               <div className={`${styles.quickActionIcon} ${styles[action.iconStyle]}`}>
                 <IconComponent />
               </div>
@@ -508,7 +339,7 @@ const QuickActionsSection = ({ actions }) => {
                 <h4>{action.title}</h4>
                 <p>{action.description}</p>
               </div>
-            </a>
+            </button>
           );
         })}
       </div>
@@ -520,227 +351,196 @@ const QuickActionsSection = ({ actions }) => {
    MAIN COMPONENT
 ========================================== */
 const AgentDashboard = () => {
-  // Mock Data
-  const mockData = {
-    alert: {
-      title: 'Visite prévue dans 2 heures',
-      text: 'Appartement F3 à Kipé avec Mme Aissatou Barry',
-      time: '15h00',
-    },
-    kpis: [
-      {
-        icon: 'building',
-        iconStyle: 'primary',
-        value: '12',
-        label: 'Biens en portefeuille',
-        trend: '+3',
-        footer: '<span class="highlight">8</span> actifs · <span>4</span> en attente',
-      },
-      {
-        icon: 'calendar',
-        iconStyle: 'info',
-        value: '3',
-        label: "Visites aujourd'hui",
-        trend: '+2',
-        footer: 'Prochaine : <span class="highlight">15h00</span>',
-      },
-      {
-        icon: 'users',
-        iconStyle: 'primary',
-        value: '23',
-        label: 'Prospects actifs',
-        trend: '+5',
-        footer: '<span class="highlight">7</span> chauds · <span>16</span> en nurturing',
-      },
-      {
-        icon: 'currency',
-        iconStyle: 'gold',
-        value: '4.8',
-        suffix: 'M GNF',
-        label: 'Commissions ce mois',
-        trend: '+18%',
-        footer: 'Objectif : <span class="highlight">6M GNF</span> (80%)',
-        gold: true,
-      },
-    ],
-    agendaItems: [
-      {
-        time: '09:30',
-        type: 'Visite',
-        status: 'completed',
-        statusLabel: 'Terminée',
-        title: 'Villa F4 - Lambanyi',
-        client: 'Mamadou Camara',
-      },
-      {
-        time: '15:00',
-        type: 'Visite',
-        status: 'active',
-        statusLabel: 'Dans 2h',
-        title: 'Appartement F3 - Kipé',
-        client: 'Aissatou Barry',
-      },
-      {
-        time: '17:30',
-        type: 'Rendez-vous',
-        status: 'upcoming',
-        statusLabel: 'Planifié',
-        title: 'Signature contrat - Studio Cosa',
-        client: 'Oumar Diallo',
-      },
-    ],
-    activities: [
-      {
-        type: 'contract',
-        title: 'Contrat signé',
-        amount: '+1.2M GNF',
-        description: 'Villa F4 Kipé - Fatoumata Barry a signé le bail',
-        time: 'Il y a 2h',
-      },
-      {
-        type: 'visit',
-        title: 'Visite confirmée',
-        description: 'Appt F3 Nongo - Mamadou Camara pour demain 10h',
-        time: 'Il y a 4h',
-      },
-      {
-        type: 'lead',
-        title: 'Nouveau prospect',
-        description: 'Ibrahima Sow - Cherche F2/F3 à Ratoma, budget 2M GNF',
-        time: 'Il y a 6h',
-      },
-      {
-        type: 'message',
-        title: 'Message de Mme Diallo',
-        description: 'Question sur le renouvellement du mandat',
-        time: 'Hier',
-      },
-    ],
-    performance: {
-      weeks: [
-        { label: 'S1', visits: 60, contracts: 30 },
-        { label: 'S2', visits: 75, contracts: 45 },
-        { label: 'S3', visits: 90, contracts: 60 },
-        { label: 'S4', visits: 85, contracts: 50 },
-      ],
-      summary: {
-        visits: 18,
-        contracts: 5,
-        conversionRate: 28,
-      },
-    },
-    objectives: [
-      {
-        type: 'locations',
-        label: 'Locations finalisées',
-        value: '5 / 6',
-        percentage: 83,
-        fillStyle: 'primary',
-        remaining: '1 restant',
-      },
-      {
-        type: 'commissions',
-        label: 'Commissions',
-        value: '4.8M / 6M',
-        percentage: 80,
-        fillStyle: 'gold',
-        style: 'gold',
-        remaining: '1.2M GNF restant',
-      },
-      {
-        type: 'clients',
-        label: 'Nouveaux clients',
-        value: '8 / 8',
-        percentage: 100,
-        fillStyle: 'complete',
-        style: 'complete',
-        completed: true,
-        remaining: '',
-      },
-      {
-        type: 'visits',
-        label: 'Visites effectuées',
-        value: '18 / 25',
-        percentage: 72,
-        fillStyle: 'primary',
-        remaining: '7 restantes',
-      },
-    ],
-    propertyAlerts: [
-      {
-        type: 'warning',
-        title: '2 mandats expirent bientôt',
-        text: 'Villa Kipé et Appt Nongo - Dans 15 jours',
-      },
-      {
-        type: 'error',
-        title: '1 bien sans visite depuis 14j',
-        text: 'Studio Cosa - Envisager réduction prix',
-      },
-      {
-        type: 'info',
-        title: '3 prospects en attente',
-        text: 'Messages non lus depuis 24h+',
-      },
-    ],
-    quickActions: [
-      {
-        icon: 'plus',
-        iconStyle: 'primary',
-        title: 'Ajouter un bien',
-        description: 'Publier une nouvelle annonce',
-      },
-      {
-        icon: 'calendar',
-        iconStyle: 'gold',
-        title: 'Planifier une visite',
-        description: 'Organiser un rendez-vous',
-      },
-      {
-        icon: 'userPlus',
-        iconStyle: 'neutral',
-        title: 'Ajouter un client',
-        description: 'Enregistrer un prospect',
-      },
-      {
-        icon: 'document',
-        iconStyle: 'primary',
-        title: 'Générer un rapport',
-        description: 'Export mensuel PDF',
-      },
-    ],
+  const { user, profile } = useAuthContext();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalProperties: 0,
+    availableProperties: 0,
+    rentedProperties: 0,
+    draftProperties: 0,
+    totalClients: 0,
+    activeRentals: 0,
+    monthlyCommissions: 0,
+  });
+  const [activities, setActivities] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    loadDashboardData();
+  }, [user]);
+
+  const loadDashboardData = async () => {
+    if (!user) return;
+    setLoading(true);
+
+    try {
+      // Fetch properties and rentals in parallel
+      const [propertiesRes, rentalsRes] = await Promise.all([
+        getProperties({ owner_id: user.id }),
+        getAgentRentals(user.id),
+      ]);
+
+      const properties = propertiesRes.data || [];
+      const rentals = rentalsRes.data || [];
+
+      const available = properties.filter(p => p.status === 'available').length;
+      const rented = properties.filter(p => p.status === 'rented').length;
+      const drafts = properties.filter(p => p.status === 'draft').length;
+      const activeRentals = rentals.filter(r => r.status === 'active');
+      const uniqueTenants = new Set(activeRentals.map(r => r.tenant_id)).size;
+
+      // Calculate monthly commissions from active rentals
+      const monthlyComm = activeRentals.reduce((sum, r) => {
+        const commission = (r.rent_amount * (r.agent_commission_percent || 10)) / 100;
+        return sum + commission;
+      }, 0);
+
+      setStats({
+        totalProperties: properties.length,
+        availableProperties: available,
+        rentedProperties: rented,
+        draftProperties: drafts,
+        totalClients: uniqueTenants,
+        activeRentals: activeRentals.length,
+        monthlyCommissions: monthlyComm,
+      });
+
+      // Build activities from recent data
+      const recentActivities: any[] = [];
+      
+      // Recent properties
+      properties.slice(0, 3).forEach(p => {
+        recentActivities.push({
+          type: 'property',
+          title: `Bien ajouté : ${p.title}`,
+          description: `${p.type} à ${p.city} — ${p.status === 'available' ? 'Disponible' : p.status}`,
+          time: p.created_at ? new Date(p.created_at as string).toLocaleDateString('fr-FR') : '',
+        });
+      });
+
+      // Recent rentals
+      activeRentals.slice(0, 2).forEach(r => {
+        const tenantName = r.tenant_profile?.full_name || 'Locataire';
+        recentActivities.push({
+          type: 'contract',
+          title: `Location active`,
+          amount: `${(r.rent_amount).toLocaleString('fr-FR')} GNF/mois`,
+          description: `${tenantName} — depuis le ${new Date(r.start_date).toLocaleDateString('fr-FR')}`,
+          time: new Date(r.created_at).toLocaleDateString('fr-FR'),
+        });
+      });
+
+      setActivities(recentActivities);
+
+      // Build alerts
+      const alertsList: any[] = [];
+      if (drafts > 0) {
+        alertsList.push({
+          type: 'warning',
+          title: `${drafts} bien(s) en brouillon`,
+          text: 'Publiez-les pour les rendre visibles aux locataires.',
+        });
+      }
+      const noImageProps = properties.filter(p => !p.images || (p.images as any[]).length === 0);
+      if (noImageProps.length > 0) {
+        alertsList.push({
+          type: 'info',
+          title: `${noImageProps.length} bien(s) sans photo`,
+          text: 'Ajoutez des photos pour attirer plus de locataires.',
+        });
+      }
+      setAlerts(alertsList);
+
+    } catch (err) {
+      console.error('Erreur chargement dashboard:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleAddProperty = () => {
-    console.log('Add property clicked');
+  const formatAmount = (amount: number) => {
+    if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`;
+    if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
+    return amount.toString();
   };
+
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const firstName = profile?.full_name?.split(' ')[0] || 'Agent';
+
+  const handleAddProperty = () => {
+    navigate('/dashbord-agent/mes-biens');
+  };
+
+  const kpis = [
+    {
+      icon: 'building',
+      iconStyle: 'primary',
+      value: stats.totalProperties.toString(),
+      label: 'Biens en portefeuille',
+      trend: null,
+      footer: `<span class="highlight">${stats.availableProperties}</span> disponibles · <span>${stats.rentedProperties}</span> loués`,
+    },
+    {
+      icon: 'users',
+      iconStyle: 'primary',
+      value: stats.totalClients.toString(),
+      label: 'Locataires actifs',
+      trend: null,
+      footer: `<span class="highlight">${stats.activeRentals}</span> locations actives`,
+    },
+    {
+      icon: 'currency',
+      iconStyle: 'gold',
+      value: formatAmount(stats.monthlyCommissions),
+      suffix: ' GNF',
+      label: 'Commissions / mois',
+      trend: null,
+      footer: `Commission sur <span class="highlight">${stats.activeRentals}</span> locations`,
+      gold: true,
+    },
+    {
+      icon: 'building',
+      iconStyle: 'info',
+      value: stats.draftProperties.toString(),
+      label: 'Brouillons',
+      trend: null,
+      footer: 'À publier pour plus de visibilité',
+    },
+  ];
+
+  if (loading) {
+    return (
+      <>
+        <TopBar date={dateStr} weather="Conakry" onAddProperty={handleAddProperty} />
+        <div className={styles.pageContent}>
+          <p style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-neutral-500)' }}>
+            Chargement du tableau de bord...
+          </p>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
-      <TopBar
-        date="Mardi 4 février 2025"
-        weather="28°C Conakry"
-        onAddProperty={handleAddProperty}
-      />
+      <TopBar date={dateStr} weather="Conakry" onAddProperty={handleAddProperty} />
 
       <div className={styles.pageContent}>
-        <AlertBanner alert={mockData.alert} />
-
         {/* KPIs */}
         <div className={styles.kpiGrid}>
-          {mockData.kpis.map((kpi, index) => (
+          {kpis.map((kpi, index) => (
             <KpiCard key={index} kpi={kpi} staggerIndex={index + 1} />
           ))}
         </div>
 
         {/* Main Dashboard Grid */}
         <div className={styles.dashboardGrid}>
-          <AgendaSection items={mockData.agendaItems} />
-          <ActivitySection activities={mockData.activities} />
-          <PerformanceSection data={mockData.performance} />
-          <ObjectivesSection objectives={mockData.objectives} month="Février" />
-          <AlertsSection alerts={mockData.propertyAlerts} />
-          <QuickActionsSection actions={mockData.quickActions} />
+          <ActivitySection activities={activities} />
+          <AlertsSection alerts={alerts} />
+          <QuickActionsSection onAddProperty={handleAddProperty} />
         </div>
       </div>
     </>
