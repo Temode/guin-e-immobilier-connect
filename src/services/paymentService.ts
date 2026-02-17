@@ -203,6 +203,93 @@ function generateReference(method: string): string {
 }
 
 /**
+ * Simulate a withdrawal (sandbox mode)
+ */
+export async function simulateWithdrawal(params: {
+  userId: string;
+  amount: number;
+  currency: string;
+  withdrawMethod: 'orange_money' | 'mtn_money' | 'bank';
+  phoneNumber?: string;
+  bankAccount?: string;
+}): Promise<{ data: TransactionData | null; error: Error | null }> {
+  // Verify wallet balance
+  const { data: wallet, error: walletErr } = await getOrCreateWallet(params.userId);
+  if (walletErr || !wallet) return { data: null, error: walletErr || new Error('Portefeuille introuvable') };
+
+  const platformFee = Math.round(params.amount * 0.05);
+  const netAmount = params.amount - platformFee;
+
+  if (wallet.balance < params.amount) {
+    return { data: null, error: new Error('Solde insuffisant pour ce retrait') };
+  }
+
+  const reference = generateReference(params.withdrawMethod);
+
+  // Create withdrawal transaction as pending
+  const { data: transaction, error: txErr } = await supabase
+    .from('transactions')
+    .insert({
+      payer_id: params.userId,
+      receiver_id: params.userId,
+      amount: params.amount,
+      currency: params.currency,
+      payment_method: params.withdrawMethod,
+      payment_reference: reference,
+      type: 'withdrawal',
+      status: 'pending',
+      description: 'Retrait de fonds',
+      metadata: {
+        sandbox: true,
+        phone_number: params.phoneNumber || null,
+        bank_account: params.bankAccount || null,
+        platform_fee: platformFee,
+        net_amount: netAmount,
+      },
+    })
+    .select()
+    .single();
+
+  if (txErr) return { data: null, error: txErr };
+
+  // Simulate processing delay
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  // Simulate success (85% chance)
+  const isSuccess = Math.random() > 0.15;
+  const finalStatus = isSuccess ? 'completed' : 'failed';
+
+  const { data: updated, error: updateErr } = await supabase
+    .from('transactions')
+    .update({
+      status: finalStatus,
+      metadata: {
+        ...(transaction.metadata as Record<string, unknown>),
+        processed_at: new Date().toISOString(),
+        failure_reason: isSuccess ? null : 'Échec du transfert (simulation)',
+      },
+    })
+    .eq('id', transaction.id)
+    .select()
+    .single();
+
+  if (updateErr) return { data: null, error: updateErr };
+
+  // If success, debit wallet
+  if (isSuccess) {
+    await supabase
+      .from('wallets')
+      .update({ balance: wallet.balance - params.amount })
+      .eq('user_id', params.userId);
+  }
+
+  return {
+    data: updated ? { ...updated, amount: Number(updated.amount) } as TransactionData : null,
+    error: null,
+  };
+}
+
+/**
  * Format amount with spaces
  */
 export function formatAmount(amount: number): string {
