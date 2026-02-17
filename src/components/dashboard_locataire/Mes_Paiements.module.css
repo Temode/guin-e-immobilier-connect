@@ -1373,6 +1373,212 @@
 }
 
 /* ==========================================
+   PAYMENT MODAL
+========================================== */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modalContent {
+  background: white;
+  border-radius: var(--radius-2xl);
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-xl);
+  animation: slideUp 0.3s ease-out;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-6);
+  border-bottom: 1px solid var(--color-neutral-100);
+}
+
+.modalHeader h3 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-neutral-900);
+}
+
+.modalCloseBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-neutral-200);
+  background: white;
+  color: var(--color-neutral-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.modalCloseBtn:hover {
+  background: var(--color-neutral-50);
+  color: var(--color-neutral-800);
+}
+
+.modalCloseBtn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.modalBody {
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.modalFooter {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+  padding: var(--space-5) var(--space-6);
+  border-top: 1px solid var(--color-neutral-100);
+}
+
+.modalAmountDisplay {
+  text-align: center;
+  padding: var(--space-6);
+  background: linear-gradient(135deg, var(--color-primary-50), var(--color-primary-100));
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-primary-200);
+}
+
+.modalAmountLabel {
+  font-size: 0.875rem;
+  color: var(--color-primary-700);
+  margin-bottom: var(--space-2);
+  display: block;
+}
+
+.modalAmountValue {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-primary-800);
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.formLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-neutral-700);
+}
+
+.formInput {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+  font-size: 0.938rem;
+  color: var(--color-neutral-800);
+  transition: var(--transition-fast);
+  font-family: var(--font-body);
+}
+
+.formInput:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.paymentMethodsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+.paymentMethodOption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 2px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+  background: white;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-neutral-700);
+}
+
+.paymentMethodOption:hover {
+  border-color: var(--color-neutral-300);
+  background: var(--color-neutral-50);
+}
+
+.paymentMethodOption.selected {
+  border-color: var(--color-primary-500);
+  background: var(--color-primary-50);
+  color: var(--color-primary-700);
+}
+
+.paymentMethodEmoji {
+  font-size: 1.25rem;
+}
+
+.sandboxBanner {
+  background: var(--color-secondary-50);
+  border: 1px solid var(--color-secondary-200);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.813rem;
+  color: var(--color-secondary-700);
+  text-align: center;
+  font-weight: 500;
+}
+
+.resultBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.resultBanner svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.resultSuccess {
+  background: var(--color-success-light);
+  color: var(--color-success);
+  border: 1px solid var(--color-primary-200);
+}
+
+.resultError {
+  background: var(--color-error-light);
+  color: var(--color-error);
+  border: 1px solid #fecaca;
+}
+
+/* ==========================================
    ANIMATIONS
 ========================================== */
 @keyframes fadeInUp {
@@ -1384,6 +1590,21 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* ==========================================
