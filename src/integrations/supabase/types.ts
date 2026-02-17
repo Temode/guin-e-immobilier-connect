@@ -146,6 +146,68 @@ export type Database = {
         }
         Relationships: []
       }
+      rentals: {
+        Row: {
+          agent_commission_percent: number | null
+          agent_id: string | null
+          created_at: string | null
+          currency: string
+          end_date: string | null
+          id: string
+          owner_id: string
+          payment_day_of_month: number | null
+          payment_method: string | null
+          property_id: string
+          rent_amount: number
+          start_date: string
+          status: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          agent_commission_percent?: number | null
+          agent_id?: string | null
+          created_at?: string | null
+          currency?: string
+          end_date?: string | null
+          id?: string
+          owner_id: string
+          payment_day_of_month?: number | null
+          payment_method?: string | null
+          property_id: string
+          rent_amount: number
+          start_date: string
+          status?: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          agent_commission_percent?: number | null
+          agent_id?: string | null
+          created_at?: string | null
+          currency?: string
+          end_date?: string | null
+          id?: string
+          owner_id?: string
+          payment_day_of_month?: number | null
+          payment_method?: string | null
+          property_id?: string
+          rent_amount?: number
+          start_date?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rentals_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
