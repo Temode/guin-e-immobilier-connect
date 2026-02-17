@@ -372,6 +372,16 @@ const PropertyCard = ({
           <span className={`${styles.propertyBadge} ${styles[getStatusBadgeClass(status)]}`}>
             {getStatusLabel(status)}
           </span>
+          {daysSinceCreated <= 7 && (
+            <span className={`${styles.propertyBadge} ${styles.badgeNew}`}>
+              Nouveau
+            </span>
+          )}
+          {(property as any).is_premium && (
+            <span className={`${styles.propertyBadge} ${styles.badgePremium}`}>
+              Premium
+            </span>
+          )}
           {property.verified && (
             <span className={`${styles.propertyBadge} ${styles.badgePremium}`}>
               Vérifié

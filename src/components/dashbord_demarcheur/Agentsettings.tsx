@@ -840,7 +840,7 @@ const AgentSettings = () => {
         phone: data.phone || '',
         birthDate: data.birth_date || '',
         nationality: data.nationality || '',
-        bio: '', // bio field could be added to profiles table later
+        bio: (data as any).bio || '',
       });
       if (data.avatar_url) {
         setAvatarUrl(`${data.avatar_url}?t=${Date.now()}`);
@@ -903,7 +903,8 @@ const AgentSettings = () => {
         phone: personalData.phone,
         nationality: personalData.nationality,
         birth_date: personalData.birthDate || null,
-      })
+        bio: personalData.bio || null,
+      } as any)
       .eq('id', user.id);
 
     if (error) {
@@ -953,7 +954,7 @@ const AgentSettings = () => {
     name: dbProfile?.full_name || user?.user_metadata?.full_name || user?.email || 'Agent',
     verified: dbProfile?.kyc_status === 'verified',
     location: dbProfile?.nationality ? `Conakry, Guinée` : '',
-    bio: personalData.bio || '',
+    bio: personalData.bio || 'Aucune biographie renseignée.',
     stats: [
       { value: '—', icon: true, label: 'Avis' },
       { value: '—', label: 'Taux réponse' },

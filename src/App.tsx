@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { PropertyProvider } from './context/PropertyContext';
 import { AuthProvider } from './context/AuthContext';
+import OfflineBanner from './components/shared/OfflineBanner';
 import SocialAuthPage from "./components/pages/SocialAuthPage";
 import EmailAuthPage from "./components/pages/EmailAuthPage";
 import UserRoleSelection from "./components/pages/UserRoleSelection";
@@ -29,6 +30,7 @@ export default function App() {
   return (
     <PropertyProvider>
       <Router>
+        <OfflineBanner />
         <AuthProvider>
           <Routes>
             <Route path="/" element={<Home />} />
