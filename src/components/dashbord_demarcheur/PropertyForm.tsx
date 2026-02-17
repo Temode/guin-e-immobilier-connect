@@ -87,13 +87,17 @@ const PropertyForm = ({ onClose, onSaved, editProperty }: PropertyFormProps) => 
     }
   };
 
+  const [savingLabel, setSavingLabel] = useState('');
+
   const handleSubmit = async (asDraft: boolean) => {
+    if (saving) return; // Prevent double submission
     setError('');
     if (!form.title.trim()) return setError('Le titre est requis');
     if (!form.price || Number(form.price) <= 0) return setError('Le prix est requis');
     if (!form.city) return setError('La ville est requise');
 
     setSaving(true);
+    setSavingLabel(asDraft ? 'Enregistrement du brouillon…' : 'Création du bien…');
     try {
       // Prepare property data
       const propertyPayload: any = {
@@ -130,18 +134,28 @@ const PropertyForm = ({ onClose, onSaved, editProperty }: PropertyFormProps) => 
 
       // Upload new images
       if (imageFiles.length > 0 && savedProperty) {
+        setSavingLabel('Upload des images…');
         const existingImages = (editProperty?.images as string[]) || [];
         const uploadedUrls: string[] = [...existingImages];
 
-        for (const file of imageFiles) {
-          const { data: url, error: uploadErr } = await uploadPropertyImage(file, savedProperty.id);
-          if (uploadErr) {
-            console.error('Image upload error:', uploadErr);
-            continue;
+        // Upload all images concurrently for speed
+        const uploadPromises = imageFiles.map(async (file) => {
+          try {
+            const { data: url, error: uploadErr } = await uploadPropertyImage(file, savedProperty.id);
+            if (uploadErr) {
+              console.error('Image upload error:', uploadErr);
+              return null;
+            }
+            return url;
+          } catch {
+            return null;
           }
-          if (url) uploadedUrls.push(url);
-        }
+        });
 
+        const results = await Promise.all(uploadPromises);
+        results.forEach((url) => { if (url) uploadedUrls.push(url); });
+
+        setSavingLabel('Finalisation…');
         await updateProperty(savedProperty.id, { images: uploadedUrls });
       }
 
@@ -151,6 +165,7 @@ const PropertyForm = ({ onClose, onSaved, editProperty }: PropertyFormProps) => 
       setError(err.message || 'Erreur lors de la sauvegarde');
     } finally {
       setSaving(false);
+      setSavingLabel('');
     }
   };
 
@@ -366,20 +381,34 @@ const PropertyForm = ({ onClose, onSaved, editProperty }: PropertyFormProps) => 
           {error && <div className={styles.error}>{error}</div>}
         </div>
 
+        {saving && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+            padding: '12px 16px', background: 'var(--color-primary-50, #F0FDF4)',
+            borderRadius: '8px', margin: '0 0 8px',
+            fontSize: '0.875rem', fontWeight: 500, color: 'var(--color-primary-700, #065F46)',
+          }}>
+            <svg style={{ animation: 'spin 1s linear infinite', width: 18, height: 18 }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {savingLabel}
+          </div>
+        )}
+
         <div className={styles.footer}>
           <button
             className={styles.btnDraft}
             disabled={saving}
             onClick={() => handleSubmit(true)}
           >
-            {saving ? 'Enregistrement...' : 'Brouillon'}
+            Brouillon
           </button>
           <button
             className={styles.btnPublish}
             disabled={saving}
             onClick={() => handleSubmit(false)}
           >
-            {saving ? 'Publication...' : 'Publier'}
+            Publier
           </button>
         </div>
       </div>
