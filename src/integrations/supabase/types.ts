@@ -95,6 +95,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          bio: string | null
           birth_date: string | null
           created_at: string
           full_name: string | null
@@ -109,6 +110,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          bio?: string | null
           birth_date?: string | null
           created_at?: string
           full_name?: string | null
@@ -123,6 +125,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          bio?: string | null
           birth_date?: string | null
           created_at?: string
           full_name?: string | null
@@ -153,6 +156,7 @@ export type Database = {
           furnished: boolean | null
           id: string
           images: Json | null
+          is_premium: boolean | null
           latitude: number | null
           longitude: number | null
           owner_id: string
@@ -181,6 +185,7 @@ export type Database = {
           furnished?: boolean | null
           id?: string
           images?: Json | null
+          is_premium?: boolean | null
           latitude?: number | null
           longitude?: number | null
           owner_id: string
@@ -209,6 +214,7 @@ export type Database = {
           furnished?: boolean | null
           id?: string
           images?: Json | null
+          is_premium?: boolean | null
           latitude?: number | null
           longitude?: number | null
           owner_id?: string
