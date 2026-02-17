@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthContext } from '@/context/AuthContext';
 import { getAgentRentals } from '@/services/rentalService';
-import { getOrCreateWallet, getUserTransactions, getPaymentStats, formatAmount, getPaymentMethodInfo, getTransactionStatusInfo, type WalletData, type TransactionData } from '@/services/paymentService';
+import { getOrCreateWallet, getUserTransactions, getPaymentStats, formatAmount, getPaymentMethodInfo, getTransactionStatusInfo, simulateWithdrawal, type WalletData, type TransactionData } from '@/services/paymentService';
 import styles from './AgentCommissions.module.css';
 
 /* ==========================================
@@ -126,7 +126,7 @@ const TopBar = () => (
 /* ==========================================
    BALANCE HERO COMPONENT
 ========================================== */
-const BalanceHero = ({ balance, currency }: { balance: number; currency: string }) => (
+const BalanceHero = ({ balance, currency, onWithdraw }: { balance: number; currency: string; onWithdraw: () => void }) => (
   <div className={styles.balanceHero}>
     <div className={styles.balanceHeroContent}>
       <div className={styles.balanceHeroTop}>
@@ -134,7 +134,12 @@ const BalanceHero = ({ balance, currency }: { balance: number; currency: string 
           <p className={styles.balanceLabel}><CreditCardIcon />Solde disponible</p>
           <h2 className={styles.balanceAmount}>{formatAmount(balance)} {currency}</h2>
         </div>
-        <div className={styles.balancePlan}><BadgeCheckIcon />Plan Basic • 5% commission</div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          <div className={styles.balancePlan}><BadgeCheckIcon />Plan Basic • 5% commission</div>
+          <button className={`${styles.btn} ${styles.btnWithdraw}`} onClick={onWithdraw} disabled={balance <= 0}>
+            <ArrowUpIcon /> Retirer des fonds
+          </button>
+        </div>
       </div>
       <div className={styles.balanceSimulation}>
         <p className={styles.simulationTitle}>Simulation de retrait total</p>
@@ -154,6 +159,230 @@ const BalanceHero = ({ balance, currency }: { balance: number; currency: string 
     </div>
   </div>
 );
+
+/* ==========================================
+   WITHDRAWAL MODAL COMPONENT
+========================================== */
+const WithdrawIcon = ({ className }: { className?: string }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+  </svg>
+);
+
+const XIcon = ({ className }: { className?: string }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+
+type WithdrawMethod = 'orange_money' | 'mtn_money' | 'bank';
+
+const WithdrawalModal = ({ 
+  isOpen, onClose, balance, currency, userId, onSuccess 
+}: { 
+  isOpen: boolean; onClose: () => void; balance: number; currency: string; userId: string; onSuccess: () => void;
+}) => {
+  const [method, setMethod] = useState<WithdrawMethod>('orange_money');
+  const [amount, setAmount] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
+  const [processing, setProcessing] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; message: string; reference?: string } | null>(null);
+
+  const numAmount = Number(amount) || 0;
+  const platformFee = Math.round(numAmount * 0.05);
+  const netAmount = numAmount - platformFee;
+
+  const methods = [
+    { id: 'orange_money' as WithdrawMethod, label: 'Orange Money', icon: '🟠', description: 'Retrait vers Orange Money' },
+    { id: 'mtn_money' as WithdrawMethod, label: 'MTN Money', icon: '🟡', description: 'Retrait vers MTN Money' },
+    { id: 'bank' as WithdrawMethod, label: 'Virement bancaire', icon: '🏦', description: 'Virement vers compte bancaire' },
+  ];
+
+  const canSubmit = numAmount >= 10000 && numAmount <= balance && !processing && 
+    ((method !== 'bank' && phoneNumber.length >= 9) || (method === 'bank' && bankAccount.length >= 10));
+
+  const handleSubmit = async () => {
+    if (!canSubmit) return;
+    setProcessing(true);
+    setResult(null);
+
+    const { data, error } = await simulateWithdrawal({
+      userId,
+      amount: numAmount,
+      currency,
+      withdrawMethod: method,
+      phoneNumber: method !== 'bank' ? phoneNumber : undefined,
+      bankAccount: method === 'bank' ? bankAccount : undefined,
+    });
+
+    setProcessing(false);
+    if (error) {
+      setResult({ success: false, message: error.message });
+    } else if (data) {
+      setResult({
+        success: data.status === 'completed',
+        message: data.status === 'completed' 
+          ? `Retrait de ${formatAmount(numAmount)} ${currency} effectué avec succès !`
+          : 'Le retrait a échoué. Veuillez réessayer.',
+        reference: data.payment_reference || undefined,
+      });
+      if (data.status === 'completed') {
+        setTimeout(() => { onSuccess(); onClose(); resetForm(); }, 2500);
+      }
+    }
+  };
+
+  const resetForm = () => {
+    setAmount('');
+    setPhoneNumber('');
+    setBankAccount('');
+    setResult(null);
+    setMethod('orange_money');
+  };
+
+  const handleClose = () => {
+    if (!processing) { onClose(); resetForm(); }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className={styles.modalOverlay} onClick={handleClose}>
+      <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className={styles.modalHeader}>
+          <div className={styles.modalHeaderLeft}>
+            <div className={styles.modalIcon}><WithdrawIcon /></div>
+            <div>
+              <h2 className={styles.modalTitle}>Retirer des fonds</h2>
+              <p className={styles.modalSubtitle}>Solde : {formatAmount(balance)} {currency}</p>
+            </div>
+          </div>
+          <button className={styles.modalCloseBtn} onClick={handleClose} disabled={processing}><XIcon /></button>
+        </div>
+
+        {/* Sandbox badge */}
+        <div className={styles.sandboxBadge}>
+          <span>🧪</span> Mode Sandbox — Simulation de retrait
+        </div>
+
+        {/* Result */}
+        {result && (
+          <div className={`${styles.resultBanner} ${result.success ? styles.resultSuccess : styles.resultError}`}>
+            {result.success ? <CheckIcon /> : <ExclamationIcon />}
+            <div>
+              <p className={styles.resultMessage}>{result.message}</p>
+              {result.reference && <p className={styles.resultRef}>Réf : {result.reference}</p>}
+            </div>
+          </div>
+        )}
+
+        {/* Processing */}
+        {processing && (
+          <div className={styles.processingOverlay}>
+            <LoaderIcon className={styles.spinIcon} />
+            <p>Traitement du retrait en cours...</p>
+            <p className={styles.processingHint}>Veuillez patienter</p>
+          </div>
+        )}
+
+        {!processing && !result?.success && (
+          <>
+            {/* Method selection */}
+            <div className={styles.methodSection}>
+              <label className={styles.fieldLabel}>Mode de retrait</label>
+              <div className={styles.methodGrid}>
+                {methods.map(m => (
+                  <button
+                    key={m.id}
+                    className={`${styles.methodCard} ${method === m.id ? styles.methodActive : ''}`}
+                    onClick={() => setMethod(m.id)}
+                  >
+                    <span className={styles.methodEmoji}>{m.icon}</span>
+                    <span className={styles.methodLabel}>{m.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Amount */}
+            <div className={styles.fieldGroup}>
+              <label className={styles.fieldLabel}>Montant à retirer ({currency})</label>
+              <input
+                type="number"
+                className={styles.fieldInput}
+                placeholder="Ex: 500000"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                min={10000}
+                max={balance}
+              />
+              <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                {[100000, 500000, 1000000].filter(v => v <= balance).map(v => (
+                  <button key={v} className={styles.quickAmount} onClick={() => setAmount(String(v))}>
+                    {formatAmount(v)}
+                  </button>
+                ))}
+                <button className={styles.quickAmount} onClick={() => setAmount(String(balance))}>Tout</button>
+              </div>
+            </div>
+
+            {/* Phone or bank */}
+            {method !== 'bank' ? (
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>Numéro de téléphone</label>
+                <input
+                  type="tel"
+                  className={styles.fieldInput}
+                  placeholder={method === 'orange_money' ? '6XX XXX XXX' : '6XX XXX XXX'}
+                  value={phoneNumber}
+                  onChange={e => setPhoneNumber(e.target.value)}
+                />
+              </div>
+            ) : (
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>Numéro de compte bancaire (IBAN)</label>
+                <input
+                  type="text"
+                  className={styles.fieldInput}
+                  placeholder="GN XX XXXX XXXX XXXX XXXX"
+                  value={bankAccount}
+                  onChange={e => setBankAccount(e.target.value)}
+                />
+              </div>
+            )}
+
+            {/* Summary */}
+            {numAmount > 0 && (
+              <div className={styles.withdrawSummary}>
+                <div className={styles.summaryRow}>
+                  <span>Montant</span><span>{formatAmount(numAmount)} {currency}</span>
+                </div>
+                <div className={styles.summaryRow}>
+                  <span>Frais plateforme (5%)</span><span className={styles.negative}>-{formatAmount(platformFee)} {currency}</span>
+                </div>
+                <div className={`${styles.summaryRow} ${styles.summaryTotal}`}>
+                  <span>Vous recevrez</span><span>{formatAmount(netAmount)} {currency}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Submit */}
+            <button
+              className={`${styles.btn} ${styles.btnPrimary} ${styles.btnLg}`}
+              style={{ width: '100%', marginTop: 16 }}
+              disabled={!canSubmit}
+              onClick={handleSubmit}
+            >
+              <WithdrawIcon /> Confirmer le retrait
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
 
 /* ==========================================
    STATS GRID COMPONENT
@@ -270,6 +499,7 @@ const AgentCommissions = () => {
   const [transactions, setTransactions] = useState<TransactionData[]>([]);
   const [stats, setStats] = useState({ totalPaid: 0, totalReceived: 0, completedCount: 0, pendingCount: 0, failedCount: 0, currency: 'GNF' });
   const [loading, setLoading] = useState(true);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -303,12 +533,23 @@ const AgentCommissions = () => {
       <TopBar />
 
       <div className={styles.pageContent}>
-        <BalanceHero balance={wallet?.balance || 0} currency={wallet?.currency || 'GNF'} />
+        <BalanceHero balance={wallet?.balance || 0} currency={wallet?.currency || 'GNF'} onWithdraw={() => setShowWithdrawModal(true)} />
         <StatsGrid stats={stats} />
         <div className={styles.contentGrid}>
           <TransactionHistory transactions={transactions} />
         </div>
       </div>
+
+      {user && (
+        <WithdrawalModal
+          isOpen={showWithdrawModal}
+          onClose={() => setShowWithdrawModal(false)}
+          balance={wallet?.balance || 0}
+          currency={wallet?.currency || 'GNF'}
+          userId={user.id}
+          onSuccess={fetchData}
+        />
+      )}
     </>
   );
 };
