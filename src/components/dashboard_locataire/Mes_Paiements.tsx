@@ -1,37 +1,16 @@
 // @ts-nocheck
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAuthContext } from '@/context/AuthContext';
+import { getTenantActiveRental, daysUntilNextPayment, formatPaymentMethod, type RentalWithDetails } from '@/services/rentalService';
+import { getUserTransactions, simulateRentPayment, getPaymentStats, formatAmount, getPaymentMethodInfo, getTransactionStatusInfo, type TransactionData } from '@/services/paymentService';
 import styles from './Mes_Paiements.module.css';
 
 /* ==========================================
-   ICONS COMPONENTS
+   ICONS COMPONENTS (kept compact)
 ========================================== */
-const HomeIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-  </svg>
-);
-
-const DashboardIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-  </svg>
-);
-
 const PaymentIcon = ({ className }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const DocumentIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-);
-
-const MessageIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
   </svg>
 );
 
@@ -54,12 +33,6 @@ const SettingsIcon = ({ className }) => (
   </svg>
 );
 
-const DotsVerticalIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-  </svg>
-);
-
 const CheckIcon = ({ className }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -69,12 +42,6 @@ const CheckIcon = ({ className }) => (
 const CheckCircleIcon = ({ className }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const VerifiedBadgeIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-    <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
   </svg>
 );
 
@@ -138,52 +105,230 @@ const XIcon = ({ className }) => (
   </svg>
 );
 
+const DocumentIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+
+const MessageIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+  </svg>
+);
+
+const LoaderIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ animation: 'spin 1s linear infinite' }}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
+
 /* ==========================================
    HEADER COMPONENT
 ========================================== */
-const Header = ({ date, hasNotifications }) => {
-  return (
-    <header className={styles.header}>
-      <div className={styles.headerLeft}>
-        <nav className={styles.breadcrumb}>
-          <a href="#">Tableau de bord</a>
-          <span className={styles.breadcrumbSeparator}>/</span>
-          <span className={styles.breadcrumbCurrent}>Mes paiements</span>
-        </nav>
-      </div>
-      <div className={styles.headerRight}>
-        <span className={styles.headerDate}>{date}</span>
-        <button className={styles.headerBtn}>
-          <NotificationIcon />
-          {hasNotifications && <span className={styles.notificationDot}></span>}
-        </button>
-        <button className={styles.headerBtn}>
-          <SettingsIcon />
-        </button>
-      </div>
-    </header>
-  );
-};
+const Header = ({ date, hasNotifications }) => (
+  <header className={styles.header}>
+    <div className={styles.headerLeft}>
+      <nav className={styles.breadcrumb}>
+        <a href="#">Tableau de bord</a>
+        <span className={styles.breadcrumbSeparator}>/</span>
+        <span className={styles.breadcrumbCurrent}>Mes paiements</span>
+      </nav>
+    </div>
+    <div className={styles.headerRight}>
+      <span className={styles.headerDate}>{date}</span>
+      <button className={styles.headerBtn}>
+        <NotificationIcon />
+        {hasNotifications && <span className={styles.notificationDot}></span>}
+      </button>
+      <button className={styles.headerBtn}>
+        <SettingsIcon />
+      </button>
+    </div>
+  </header>
+);
 
 /* ==========================================
-   PAGE HEADER COMPONENT
+   PAYMENT MODAL COMPONENT
 ========================================== */
-const PageHeader = ({ onExport, onManualPay }) => {
+const PaymentModal = ({ isOpen, onClose, rental, onPaymentComplete }) => {
+  const [selectedMethod, setSelectedMethod] = useState('orange_money');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvc, setCardCvc] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [result, setResult] = useState(null);
+
+  if (!isOpen || !rental) return null;
+
+  const paymentMethods = [
+    { id: 'orange_money', label: 'Orange Money', icon: '🟠' },
+    { id: 'mtn_money', label: 'MTN Money', icon: '🟡' },
+    { id: 'visa', label: 'Visa', icon: '💳' },
+    { id: 'mastercard', label: 'Mastercard', icon: '💳' },
+  ];
+
+  const isCardMethod = selectedMethod === 'visa' || selectedMethod === 'mastercard';
+
+  const handlePay = async () => {
+    setIsProcessing(true);
+    setResult(null);
+    try {
+      const { data, error } = await simulateRentPayment({
+        rentalId: rental.id,
+        payerId: rental.tenant_id,
+        receiverId: rental.owner_id,
+        amount: rental.rent_amount,
+        currency: rental.currency,
+        paymentMethod: selectedMethod,
+        description: `Loyer - ${new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`,
+        phoneNumber: !isCardMethod ? phoneNumber : undefined,
+        cardLast4: isCardMethod ? cardNumber.slice(-4) : undefined,
+      });
+
+      if (error) {
+        setResult({ success: false, message: error.message });
+      } else if (data?.status === 'completed') {
+        setResult({ success: true, message: 'Paiement effectué avec succès !' });
+        onPaymentComplete?.();
+      } else {
+        setResult({ success: false, message: (data?.metadata as any)?.failure_reason || 'Le paiement a échoué.' });
+      }
+    } catch (err) {
+      setResult({ success: false, message: 'Erreur inattendue.' });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
-    <div className={styles.pageHeader}>
-      <div className={styles.pageHeaderLeft}>
-        <h1>Mes paiements</h1>
-        <p>Consultez l'historique de vos paiements et gérez vos moyens de paiement</p>
-      </div>
-      <div className={styles.pageActions}>
-        <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={onExport}>
-          <DownloadIcon />
-          Exporter tout
-        </button>
-        <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onManualPay}>
-          <PlusIcon />
-          Payer manuellement
-        </button>
+    <div className={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && !isProcessing && onClose()}>
+      <div className={styles.modalContent}>
+        <div className={styles.modalHeader}>
+          <h3>Payer mon loyer</h3>
+          <button className={styles.modalCloseBtn} onClick={onClose} disabled={isProcessing}>
+            <XIcon />
+          </button>
+        </div>
+        <div className={styles.modalBody}>
+          <div className={styles.modalAmountDisplay}>
+            <span className={styles.modalAmountLabel}>Montant du loyer</span>
+            <span className={styles.modalAmountValue}>
+              {formatAmount(rental.rent_amount)} {rental.currency}
+            </span>
+          </div>
+
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>Choisir un mode de paiement</label>
+            <div className={styles.paymentMethodsGrid}>
+              {paymentMethods.map((pm) => (
+                <button
+                  key={pm.id}
+                  className={`${styles.paymentMethodOption} ${selectedMethod === pm.id ? styles.selected : ''}`}
+                  onClick={() => setSelectedMethod(pm.id)}
+                  disabled={isProcessing}
+                >
+                  <span className={styles.paymentMethodEmoji}>{pm.icon}</span>
+                  <span>{pm.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {!isCardMethod && (
+            <div className={styles.formGroup}>
+              <label className={styles.formLabel}>Numéro de téléphone</label>
+              <input
+                type="tel"
+                className={styles.formInput}
+                placeholder="+224 6XX XX XX XX"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                disabled={isProcessing}
+              />
+            </div>
+          )}
+
+          {isCardMethod && (
+            <>
+              <div className={styles.formGroup}>
+                <label className={styles.formLabel}>Numéro de carte</label>
+                <input
+                  type="text"
+                  className={styles.formInput}
+                  placeholder="4242 4242 4242 4242"
+                  value={cardNumber}
+                  onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, '').slice(0, 16))}
+                  disabled={isProcessing}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>Expiration</label>
+                  <input
+                    type="text"
+                    className={styles.formInput}
+                    placeholder="MM/AA"
+                    value={cardExpiry}
+                    onChange={(e) => setCardExpiry(e.target.value)}
+                    disabled={isProcessing}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.formLabel}>CVC</label>
+                  <input
+                    type="text"
+                    className={styles.formInput}
+                    placeholder="123"
+                    value={cardCvc}
+                    onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    disabled={isProcessing}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className={styles.sandboxBanner}>
+            ⚡ Mode Sandbox — Le paiement est simulé. Aucun prélèvement réel.
+          </div>
+
+          {result && (
+            <div className={`${styles.resultBanner} ${result.success ? styles.resultSuccess : styles.resultError}`}>
+              {result.success ? <CheckCircleIcon /> : <XIcon />}
+              <span>{result.message}</span>
+            </div>
+          )}
+        </div>
+
+        <div className={styles.modalFooter}>
+          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={onClose} disabled={isProcessing}>
+            Annuler
+          </button>
+          <button
+            className={`${styles.btn} ${styles.btnPrimary}`}
+            onClick={handlePay}
+            disabled={isProcessing || (result && result.success)}
+          >
+            {isProcessing ? (
+              <>
+                <LoaderIcon />
+                Traitement en cours...
+              </>
+            ) : result?.success ? (
+              <>
+                <CheckIcon />
+                Payé
+              </>
+            ) : (
+              <>
+                <PaymentIcon />
+                Confirmer le paiement
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -193,27 +338,15 @@ const PageHeader = ({ onExport, onManualPay }) => {
    STATS GRID COMPONENT
 ========================================== */
 const StatsGrid = ({ stats }) => {
-  const iconMap = {
-    payment: PaymentIcon,
-    check: CheckCircleIcon,
-    calendar: CalendarIcon,
-    document: DocumentIcon,
-  };
-
+  const iconMap = { payment: PaymentIcon, check: CheckCircleIcon, calendar: CalendarIcon, document: DocumentIcon };
   return (
     <div className={styles.statsGrid}>
       {stats.map((stat, index) => {
         const IconComponent = iconMap[stat.iconType] || PaymentIcon;
         return (
-          <div 
-            key={index} 
-            className={`${styles.statCard} ${stat.highlight ? styles.highlight : ''}`}
-            style={{ animationDelay: `${index * 0.05}s` }}
-          >
+          <div key={index} className={`${styles.statCard} ${stat.highlight ? styles.highlight : ''}`} style={{ animationDelay: `${index * 0.05}s` }}>
             <div className={styles.statHeader}>
-              <div className={`${styles.statIcon} ${styles[stat.iconColor] || ''}`}>
-                <IconComponent />
-              </div>
+              <div className={`${styles.statIcon} ${styles[stat.iconColor] || ''}`}><IconComponent /></div>
               {stat.trend && (
                 <span className={`${styles.statTrend} ${styles[stat.trendType] || ''}`}>
                   {stat.trendIcon && <CheckIcon />}
@@ -233,68 +366,41 @@ const StatsGrid = ({ stats }) => {
 /* ==========================================
    NEXT PAYMENT CARD COMPONENT
 ========================================== */
-const NextPaymentCard = ({ payment }) => {
-  return (
-    <div className={styles.nextPaymentCard}>
-      <div className={styles.nextPaymentHeader}>
-        <span className={styles.nextPaymentLabel}>Prochain prélèvement automatique</span>
-        <span className={styles.nextPaymentStatus}>
-          <ClockIcon />
-          Programmé
-        </span>
+const NextPaymentCard = ({ payment }) => (
+  <div className={styles.nextPaymentCard}>
+    <div className={styles.nextPaymentHeader}>
+      <span className={styles.nextPaymentLabel}>Prochain prélèvement</span>
+      <span className={styles.nextPaymentStatus}><ClockIcon />Programmé</span>
+    </div>
+    <p className={styles.nextPaymentAmount}>{payment.amount}<span>{payment.currency}</span></p>
+    <p className={styles.nextPaymentDue}>Prévu le <strong>{payment.dueDate}</strong> — {payment.description}</p>
+    <div className={styles.nextPaymentFooter}>
+      <div className={styles.countdownDisplay}>
+        <span className={styles.countdownNumber}>{payment.daysRemaining}</span>
+        <span className={styles.countdownText}>jours restants</span>
       </div>
-      <p className={styles.nextPaymentAmount}>
-        {payment.amount}<span>{payment.currency}</span>
-      </p>
-      <p className={styles.nextPaymentDue}>
-        Prévu le <strong>{payment.dueDate}</strong> — {payment.description}
-      </p>
-      <div className={styles.nextPaymentFooter}>
-        <div className={styles.countdownDisplay}>
-          <span className={styles.countdownNumber}>{payment.daysRemaining}</span>
-          <span className={styles.countdownText}>jours restants</span>
-        </div>
-        <div className={styles.paymentMethodMini}>
-          <div className={styles.paymentMethodMiniIcon}>OM</div>
-          <div className={styles.paymentMethodMiniText}>
-            {payment.method}
-            <span>{payment.methodNumber}</span>
-          </div>
-        </div>
+      <div className={styles.paymentMethodMini}>
+        <div className={styles.paymentMethodMiniIcon}>{payment.methodIcon}</div>
+        <div className={styles.paymentMethodMiniText}>{payment.method}<span>{payment.methodNumber}</span></div>
       </div>
     </div>
-  );
-};
+  </div>
+);
 
 /* ==========================================
    FILTERS BAR COMPONENT
 ========================================== */
 const FiltersBar = ({ activeFilter, onFilterChange, searchQuery, onSearchChange }) => {
   const filters = ['Tous', 'Payés', 'En attente', 'Échoués'];
-
   return (
     <div className={styles.filtersBar}>
       <div className={styles.filtersLeft}>
         {filters.map((filter) => (
-          <button
-            key={filter}
-            className={`${styles.filterBtn} ${activeFilter === filter ? styles.active : ''}`}
-            onClick={() => onFilterChange(filter)}
-          >
-            {filter}
-          </button>
+          <button key={filter} className={`${styles.filterBtn} ${activeFilter === filter ? styles.active : ''}`} onClick={() => onFilterChange(filter)}>{filter}</button>
         ))}
       </div>
       <div className={styles.filtersRight}>
-        <div className={styles.searchInput}>
-          <SearchIcon />
-          <input
-            type="text"
-            placeholder="Rechercher..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-          />
-        </div>
+        <div className={styles.searchInput}><SearchIcon /><input type="text" placeholder="Rechercher..." value={searchQuery} onChange={(e) => onSearchChange(e.target.value)} /></div>
       </div>
     </div>
   );
@@ -303,61 +409,43 @@ const FiltersBar = ({ activeFilter, onFilterChange, searchQuery, onSearchChange 
 /* ==========================================
    PAYMENT TABLE COMPONENT
 ========================================== */
-const PaymentTable = ({ payments, onDownload }) => {
+const PaymentTable = ({ payments }) => {
   const getStatusIcon = (status) => {
-    switch (status) {
-      case 'success': return CheckIcon;
-      case 'pending': return ClockIcon;
-      case 'failed': return XIcon;
-      default: return CheckIcon;
-    }
-  };
-
-  const getStatusLabel = (status) => {
-    switch (status) {
-      case 'success': return 'Payé';
-      case 'pending': return 'En attente';
-      case 'failed': return 'Échoué';
-      default: return status;
-    }
+    if (status === 'completed') return CheckIcon;
+    if (status === 'pending') return ClockIcon;
+    return XIcon;
   };
 
   return (
     <div className={styles.paymentTable}>
       <div className={styles.paymentTableHeader}>
-        <span>Transaction</span>
-        <span>Date</span>
-        <span>Montant</span>
-        <span>Statut</span>
-        <span>Reçu</span>
+        <span>Transaction</span><span>Date</span><span>Montant</span><span>Statut</span><span>Reçu</span>
       </div>
-
+      {payments.length === 0 && (
+        <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--color-neutral-400)' }}>
+          Aucune transaction trouvée
+        </div>
+      )}
       {payments.map((payment, index) => {
         const StatusIcon = getStatusIcon(payment.status);
+        const statusInfo = getTransactionStatusInfo(payment.status);
+        const methodInfo = getPaymentMethodInfo(payment.payment_method);
         return (
-          <div key={index} className={styles.paymentTableRow}>
+          <div key={payment.id || index} className={styles.paymentTableRow}>
             <div className={styles.paymentInfo}>
-              <div className={`${styles.paymentIcon} ${styles[payment.status]}`}>
-                <StatusIcon />
-              </div>
+              <div className={`${styles.paymentIcon} ${styles[statusInfo.color]}`}><StatusIcon /></div>
               <div className={styles.paymentDetails}>
-                <h4>{payment.title}</h4>
-                <p>{payment.method}</p>
+                <h4>{payment.description || 'Paiement de loyer'}</h4>
+                <p>{methodInfo.label}</p>
               </div>
             </div>
-            <span className={styles.paymentDate}>{payment.date}</span>
-            <span className={styles.paymentAmount}>{payment.amount}</span>
-            <span className={`${styles.paymentStatusBadge} ${styles[payment.status]}`}>
-              <StatusIcon />
-              {getStatusLabel(payment.status)}
+            <span className={styles.paymentDate}>{new Date(payment.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+            <span className={styles.paymentAmount}>{formatAmount(payment.amount)} {payment.currency}</span>
+            <span className={`${styles.paymentStatusBadge} ${styles[statusInfo.color]}`}>
+              <StatusIcon />{statusInfo.label}
             </span>
             <div className={styles.paymentActions}>
-              <button 
-                className={styles.downloadBtn}
-                onClick={() => onDownload(payment.id)}
-              >
-                <DownloadIcon />
-              </button>
+              <button className={styles.downloadBtn}><DownloadIcon /></button>
             </div>
           </div>
         );
@@ -372,36 +460,15 @@ const PaymentTable = ({ payments, onDownload }) => {
 const Pagination = ({ currentPage, totalPages, totalItems, itemsPerPage, onPageChange }) => {
   const startItem = (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
-
   return (
     <div className={styles.pagination}>
-      <span className={styles.paginationInfo}>
-        Affichage {startItem}-{endItem} sur {totalItems} paiements
-      </span>
+      <span className={styles.paginationInfo}>Affichage {startItem}-{endItem} sur {totalItems} paiements</span>
       <div className={styles.paginationButtons}>
-        <button
-          className={styles.paginationBtn}
-          disabled={currentPage === 1}
-          onClick={() => onPageChange(currentPage - 1)}
-        >
-          <ChevronLeftIcon />
-        </button>
-        {[...Array(totalPages)].map((_, index) => (
-          <button
-            key={index}
-            className={`${styles.paginationBtn} ${currentPage === index + 1 ? styles.active : ''}`}
-            onClick={() => onPageChange(index + 1)}
-          >
-            {index + 1}
-          </button>
+        <button className={styles.paginationBtn} disabled={currentPage === 1} onClick={() => onPageChange(currentPage - 1)}><ChevronLeftIcon /></button>
+        {[...Array(totalPages)].map((_, i) => (
+          <button key={i} className={`${styles.paginationBtn} ${currentPage === i + 1 ? styles.active : ''}`} onClick={() => onPageChange(i + 1)}>{i + 1}</button>
         ))}
-        <button
-          className={styles.paginationBtn}
-          disabled={currentPage === totalPages}
-          onClick={() => onPageChange(currentPage + 1)}
-        >
-          <ChevronRightIcon />
-        </button>
+        <button className={styles.paginationBtn} disabled={currentPage === totalPages} onClick={() => onPageChange(currentPage + 1)}><ChevronRightIcon /></button>
       </div>
     </div>
   );
@@ -410,111 +477,46 @@ const Pagination = ({ currentPage, totalPages, totalItems, itemsPerPage, onPageC
 /* ==========================================
    PAYMENT METHOD CARD COMPONENT
 ========================================== */
-const PaymentMethodCard = ({ method, onEdit, onAdd }) => {
-  return (
-    <div className={styles.card}>
-      <div className={styles.cardHeader}>
-        <h3 className={styles.cardTitle}>
-          <CreditCardIcon />
-          Moyen de paiement
-        </h3>
-      </div>
-      <div className={styles.cardBody}>
-        <div className={styles.paymentMethodCardInner}>
-          <div className={styles.paymentMethodHeader}>
-            <span className={styles.paymentMethodTitle}>Compte principal</span>
-            <span className={styles.paymentMethodBadge}>
-              <CheckIcon />
-              Actif
-            </span>
-          </div>
-          <div className={styles.paymentMethodContent}>
-            <div className={styles.paymentMethodIcon}>OM</div>
-            <div className={styles.paymentMethodInfo}>
-              <p className={styles.paymentMethodName}>{method.name}</p>
-              <p className={styles.paymentMethodNumber}>{method.number}</p>
-            </div>
-          </div>
-          <div className={styles.paymentMethodActions}>
-            <button className={`${styles.paymentMethodBtn} ${styles.edit}`} onClick={onEdit}>
-              Modifier
-            </button>
-            <button className={`${styles.paymentMethodBtn} ${styles.add}`} onClick={onAdd}>
-              + Ajouter
-            </button>
+const PaymentMethodCard = ({ method }) => (
+  <div className={styles.card}>
+    <div className={styles.cardHeader}>
+      <h3 className={styles.cardTitle}><CreditCardIcon />Moyen de paiement</h3>
+    </div>
+    <div className={styles.cardBody}>
+      <div className={styles.paymentMethodCardInner}>
+        <div className={styles.paymentMethodHeader}>
+          <span className={styles.paymentMethodTitle}>Compte principal</span>
+          <span className={styles.paymentMethodBadge}><CheckIcon />Actif</span>
+        </div>
+        <div className={styles.paymentMethodContent}>
+          <div className={styles.paymentMethodIcon}>{method.iconText}</div>
+          <div className={styles.paymentMethodInfo}>
+            <p className={styles.paymentMethodName}>{method.name}</p>
+            <p className={styles.paymentMethodNumber}>{method.number}</p>
           </div>
         </div>
       </div>
     </div>
-  );
-};
-
-/* ==========================================
-   YEARLY CHART COMPONENT
-========================================== */
-const YearlyChart = ({ data }) => {
-  return (
-    <div className={styles.card}>
-      <div className={styles.cardHeader}>
-        <h3 className={styles.cardTitle}>
-          <ChartIcon />
-          Historique annuel
-        </h3>
-      </div>
-      <div className={styles.cardBody}>
-        <div className={styles.chartContainer}>
-          {data.map((item, index) => (
-            <div 
-              key={index} 
-              className={`${styles.chartBar} ${item.current ? styles.current : ''}`}
-            >
-              <div 
-                className={styles.chartBarFill} 
-                style={{ height: `${item.percentage}%` }}
-              ></div>
-              <span className={styles.chartBarLabel}>{item.month}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
+  </div>
+);
 
 /* ==========================================
    QUICK ACTIONS COMPONENT
 ========================================== */
 const QuickActions = ({ actions }) => {
-  const iconMap = {
-    document: DocumentIcon,
-    message: MessageIcon,
-    settings: SettingsIcon,
-  };
-
+  const iconMap = { document: DocumentIcon, message: MessageIcon, settings: SettingsIcon };
   return (
     <div className={styles.card}>
-      <div className={styles.cardHeader}>
-        <h3 className={styles.cardTitle}>
-          <LightningIcon />
-          Actions rapides
-        </h3>
-      </div>
+      <div className={styles.cardHeader}><h3 className={styles.cardTitle}><LightningIcon />Actions rapides</h3></div>
       <div className={styles.cardBodyNoPaddingTop}>
         <div className={styles.quickActionList}>
           {actions.map((action, index) => {
             const IconComponent = iconMap[action.iconType] || DocumentIcon;
             return (
               <a key={index} href={action.href} className={styles.quickActionItem}>
-                <div className={`${styles.quickActionIcon} ${styles[action.iconColor]}`}>
-                  <IconComponent />
-                </div>
-                <div className={styles.quickActionContent}>
-                  <h4>{action.title}</h4>
-                  <p>{action.description}</p>
-                </div>
-                <span className={styles.quickActionArrow}>
-                  <ChevronRightIcon />
-                </span>
+                <div className={`${styles.quickActionIcon} ${styles[action.iconColor]}`}><IconComponent /></div>
+                <div className={styles.quickActionContent}><h4>{action.title}</h4><p>{action.description}</p></div>
+                <span className={styles.quickActionArrow}><ChevronRightIcon /></span>
               </a>
             );
           })}
@@ -528,150 +530,135 @@ const QuickActions = ({ actions }) => {
    MAIN COMPONENT
 ========================================== */
 const Mes_Paiements = () => {
+  const { user } = useAuthContext();
   const [activeFilter, setActiveFilter] = useState('Tous');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [rental, setRental] = useState<RentalWithDetails | null>(null);
+  const [transactions, setTransactions] = useState<TransactionData[]>([]);
+  const [stats, setStats] = useState({ totalPaid: 0, completedCount: 0, pendingCount: 0, failedCount: 0, currency: 'GNF' });
+  const [loading, setLoading] = useState(true);
+  const [isPayModalOpen, setIsPayModalOpen] = useState(false);
 
-  // Données mock
-  const mockData = {
-    user: {
-      name: 'Mamadou Bah',
-      role: 'Locataire',
-      verified: true,
-    },
-    stats: [
-      {
-        iconType: 'payment',
-        iconColor: '',
-        value: '16 000 000 GNF',
-        label: 'Total payé depuis Juin 2025',
-        trend: 'À jour',
-        trendType: 'up',
-        trendIcon: true,
-        highlight: true,
-      },
-      {
-        iconType: 'check',
-        iconColor: 'green',
-        value: '8',
-        label: 'Paiements effectués',
-        trend: 'Stable',
-        trendType: 'neutral',
-      },
-      {
-        iconType: 'calendar',
-        iconColor: 'orange',
-        value: '12 jours',
-        label: 'Avant prochain loyer',
-      },
-      {
-        iconType: 'document',
-        iconColor: 'blue',
-        value: '8',
-        label: 'Reçus disponibles',
-      },
-    ],
-    nextPayment: {
-      amount: '2 000 000',
-      currency: 'GNF',
-      dueDate: '1er Février 2026',
-      description: 'Loyer de Février',
-      daysRemaining: 12,
-      method: 'Orange Money',
-      methodNumber: '620 ** ** 45',
-    },
-    payments: [
-      { id: 1, title: 'Loyer Janvier 2026', method: 'Orange Money • Auto', date: '1 Jan 2026', amount: '2 000 000 GNF', status: 'success' },
-      { id: 2, title: 'Loyer Décembre 2025', method: 'Orange Money • Auto', date: '1 Déc 2025', amount: '2 000 000 GNF', status: 'success' },
-      { id: 3, title: 'Loyer Novembre 2025', method: 'Orange Money • Auto', date: '1 Nov 2025', amount: '2 000 000 GNF', status: 'success' },
-      { id: 4, title: 'Loyer Octobre 2025', method: 'Orange Money • Auto', date: '1 Oct 2025', amount: '2 000 000 GNF', status: 'success' },
-      { id: 5, title: 'Loyer Septembre 2025', method: 'Orange Money • Manuel', date: '3 Sep 2025', amount: '2 000 000 GNF', status: 'success' },
-    ],
-    paymentMethod: {
-      name: 'Orange Money',
-      number: '620 ** ** 45',
-    },
-    chartData: [
-      { month: 'Juin', percentage: 100 },
-      { month: 'Juil', percentage: 100 },
-      { month: 'Août', percentage: 100 },
-      { month: 'Sep', percentage: 100 },
-      { month: 'Oct', percentage: 100 },
-      { month: 'Nov', percentage: 100 },
-      { month: 'Déc', percentage: 100 },
-      { month: 'Jan', percentage: 100, current: true },
-      { month: 'Fév', percentage: 0 },
-      { month: 'Mar', percentage: 0 },
-      { month: 'Avr', percentage: 0 },
-      { month: 'Mai', percentage: 0 },
-    ],
-    quickActions: [
-      { iconType: 'document', iconColor: 'green', title: 'Télécharger tous les reçus', description: 'Format ZIP • 8 fichiers', href: '#' },
-      { iconType: 'message', iconColor: 'blue', title: 'Contacter le support', description: 'Problème de paiement ?', href: '#' },
-      { iconType: 'settings', iconColor: 'orange', title: 'Paramètres paiement', description: 'Notifications, rappels...', href: '#' },
-    ],
-  };
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    const [rentalRes, txRes, statsRes] = await Promise.all([
+      getTenantActiveRental(user.id),
+      getUserTransactions(user.id, { limit: 50 }),
+      getPaymentStats(user.id, 'tenant'),
+    ]);
+    setRental(rentalRes.data);
+    setTransactions(txRes.data);
+    setStats(statsRes);
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const itemsPerPage = 5;
+  const filteredTransactions = transactions.filter((t) => {
+    if (activeFilter === 'Payés') return t.status === 'completed';
+    if (activeFilter === 'En attente') return t.status === 'pending';
+    if (activeFilter === 'Échoués') return t.status === 'failed';
+    return true;
+  }).filter((t) => {
+    if (!searchQuery) return true;
+    return (t.description || '').toLowerCase().includes(searchQuery.toLowerCase()) || t.payment_method.toLowerCase().includes(searchQuery.toLowerCase());
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredTransactions.length / itemsPerPage));
+  const paginatedTransactions = filteredTransactions.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const daysUntil = rental ? daysUntilNextPayment(rental.payment_day_of_month) : 0;
+  const payMethod = rental ? formatPaymentMethod(rental.payment_method) : { label: 'Non défini', iconText: '—' };
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+
+  const statsCards = [
+    { iconType: 'payment', iconColor: '', value: `${formatAmount(stats.totalPaid)} GNF`, label: 'Total payé', trend: stats.completedCount > 0 ? 'À jour' : undefined, trendType: 'up', trendIcon: true, highlight: true },
+    { iconType: 'check', iconColor: 'green', value: String(stats.completedCount), label: 'Paiements effectués' },
+    { iconType: 'calendar', iconColor: 'orange', value: rental ? `${daysUntil} jours` : '—', label: 'Avant prochain loyer' },
+    { iconType: 'document', iconColor: 'blue', value: String(stats.completedCount), label: 'Reçus disponibles' },
+  ];
+
+  const quickActions = [
+    { iconType: 'document', iconColor: 'green', title: 'Télécharger tous les reçus', description: `${stats.completedCount} fichiers`, href: '#' },
+    { iconType: 'message', iconColor: 'blue', title: 'Contacter le support', description: 'Problème de paiement ?', href: '#' },
+    { iconType: 'settings', iconColor: 'orange', title: 'Paramètres paiement', description: 'Notifications, rappels...', href: '#' },
+  ];
+
+  if (loading) {
+    return (
+      <>
+        <Header date={dateStr} hasNotifications={false} />
+        <main className={styles.mainContent}>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px', color: 'var(--color-neutral-400)' }}>
+            <LoaderIcon /> <span style={{ marginLeft: 12 }}>Chargement des paiements...</span>
+          </div>
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
-      <Header date="Dim. 1 Février 2026" hasNotifications />
+      <Header date={dateStr} hasNotifications={stats.pendingCount > 0} />
 
       <main className={styles.mainContent}>
-        <PageHeader
-          onExport={() => console.log('Export all')}
-          onManualPay={() => console.log('Manual pay')}
-        />
+        <div className={styles.pageHeader}>
+          <div className={styles.pageHeaderLeft}>
+            <h1>Mes paiements</h1>
+            <p>Consultez l'historique de vos paiements et gérez vos moyens de paiement</p>
+          </div>
+          <div className={styles.pageActions}>
+            <button className={`${styles.btn} ${styles.btnSecondary}`}><DownloadIcon />Exporter tout</button>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={() => setIsPayModalOpen(true)} disabled={!rental}>
+              <PlusIcon />Payer mon loyer
+            </button>
+          </div>
+        </div>
 
-        <StatsGrid stats={mockData.stats} />
+        <StatsGrid stats={statsCards} />
 
         <div className={styles.paymentsLayout}>
           <div className={styles.paymentsMain}>
-            <NextPaymentCard payment={mockData.nextPayment} />
+            {rental && (
+              <NextPaymentCard payment={{
+                amount: formatAmount(rental.rent_amount),
+                currency: rental.currency,
+                dueDate: `${rental.payment_day_of_month} ${new Date(now.getFullYear(), now.getMonth() + (now.getDate() < rental.payment_day_of_month ? 0 : 1)).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`,
+                description: 'Loyer mensuel',
+                daysRemaining: daysUntil,
+                method: payMethod.label,
+                methodIcon: payMethod.iconText,
+                methodNumber: '',
+              }} />
+            )}
 
             <div className={styles.card}>
               <div className={styles.cardHeader}>
-                <h3 className={styles.cardTitle}>
-                  <ClockIcon />
-                  Historique des paiements
-                </h3>
+                <h3 className={styles.cardTitle}><ClockIcon />Historique des paiements</h3>
               </div>
               <div className={styles.cardBody}>
-                <FiltersBar
-                  activeFilter={activeFilter}
-                  onFilterChange={setActiveFilter}
-                  searchQuery={searchQuery}
-                  onSearchChange={setSearchQuery}
-                />
-
-                <PaymentTable
-                  payments={mockData.payments}
-                  onDownload={(id) => console.log('Download receipt', id)}
-                />
-
-                <Pagination
-                  currentPage={currentPage}
-                  totalPages={2}
-                  totalItems={8}
-                  itemsPerPage={5}
-                  onPageChange={setCurrentPage}
-                />
+                <FiltersBar activeFilter={activeFilter} onFilterChange={(f) => { setActiveFilter(f); setCurrentPage(1); }} searchQuery={searchQuery} onSearchChange={(q) => { setSearchQuery(q); setCurrentPage(1); }} />
+                <PaymentTable payments={paginatedTransactions} />
+                {filteredTransactions.length > itemsPerPage && (
+                  <Pagination currentPage={currentPage} totalPages={totalPages} totalItems={filteredTransactions.length} itemsPerPage={itemsPerPage} onPageChange={setCurrentPage} />
+                )}
               </div>
             </div>
           </div>
 
           <div className={styles.paymentsSide}>
-            <PaymentMethodCard
-              method={mockData.paymentMethod}
-              onEdit={() => console.log('Edit method')}
-              onAdd={() => console.log('Add method')}
-            />
-
-            <YearlyChart data={mockData.chartData} />
-
-            <QuickActions actions={mockData.quickActions} />
+            <PaymentMethodCard method={{ name: payMethod.label, number: rental?.payment_method ? '' : 'Non configuré', iconText: payMethod.iconText }} />
+            <QuickActions actions={quickActions} />
           </div>
         </div>
       </main>
+
+      <PaymentModal isOpen={isPayModalOpen} onClose={() => { setIsPayModalOpen(false); }} rental={rental} onPaymentComplete={fetchData} />
     </>
   );
 };
