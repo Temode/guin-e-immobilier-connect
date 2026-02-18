@@ -4,6 +4,7 @@ import styles from './Agentmesbiens.module.css';
 import { useAuthContext } from '@/context/AuthContext';
 import { getProperties, deleteProperty, type PropertyData } from '@/services/propertyService';
 import PropertyForm from './PropertyForm';
+import AddTenantModal from './AddTenantModal';
 
 /* ==========================================
    ICONS COMPONENTS
@@ -338,12 +339,14 @@ const PropertyCard = ({
   onEdit,
   onDelete,
   onView,
+  onAddTenant,
 }: {
   property: PropertyData;
   index: number;
   onEdit: (p: PropertyData) => void;
   onDelete: (id: string) => void;
   onView: (id: string) => void;
+  onAddTenant?: (id: string) => void;
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -460,12 +463,23 @@ const PropertyCard = ({
               <span className={styles.propertyOwnerName}>{property.transaction_type === 'location' ? 'Location' : 'Vente'}</span>
             </div>
           </div>
-          <button
-            className={styles.propertyActionBtn}
-            onClick={() => onView(property.id!)}
-          >
-            Voir détails
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {property.transaction_type === 'location' && property.status !== 'rented' && onAddTenant && (
+              <button
+                className={styles.propertyActionBtn}
+                style={{ background: '#10b981', color: '#fff', border: 'none' }}
+                onClick={(e) => { e.stopPropagation(); onAddTenant(property.id!); }}
+              >
+                + Locataire
+              </button>
+            )}
+            <button
+              className={styles.propertyActionBtn}
+              onClick={() => onView(property.id!)}
+            >
+              Voir détails
+            </button>
+          </div>
         </div>
       </div>
     </article>
@@ -534,6 +548,8 @@ const AgentMesBiens = () => {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editProperty, setEditProperty] = useState<PropertyData | null>(null);
+  const [showAddTenant, setShowAddTenant] = useState(false);
+  const [addTenantPropertyId, setAddTenantPropertyId] = useState<string | undefined>(undefined);
 
   const loadProperties = useCallback(async () => {
     if (!user) return;
@@ -673,6 +689,7 @@ const AgentMesBiens = () => {
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onView={handleView}
+                onAddTenant={(id) => { setAddTenantPropertyId(id); setShowAddTenant(true); }}
               />
             ))}
           </div>
@@ -690,6 +707,14 @@ const AgentMesBiens = () => {
           onClose={() => { setShowForm(false); setEditProperty(null); }}
           onSaved={loadProperties}
           editProperty={editProperty}
+        />
+      )}
+
+      {showAddTenant && (
+        <AddTenantModal
+          onClose={() => { setShowAddTenant(false); setAddTenantPropertyId(undefined); }}
+          onSuccess={loadProperties}
+          preselectedPropertyId={addTenantPropertyId}
         />
       )}
     </>
