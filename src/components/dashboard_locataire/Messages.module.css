@@ -1017,6 +1017,63 @@
   flex-direction: column;
 }
 
+/* Realtime additions */
+.messagesContainer { display: flex; height: calc(100vh - 70px); overflow: hidden; }
+.conversationsPanel { width: 320px; flex-shrink: 0; border-right: 1px solid #f0f0f0; display: flex; flex-direction: column; background: #fff; overflow: hidden; }
+.conversationsHeader { padding: 1rem 1.25rem 0.5rem; }
+.conversationsHeader h3 { font-size: 1rem; font-weight: 700; color: #1a1a2e; margin: 0; }
+.searchBar { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 1rem; padding: 0.5rem 0.875rem; background: #f9fafb; border: 1.5px solid #e5e7eb; border-radius: 10px; }
+.searchBar svg { width: 16px; height: 16px; color: #9ca3af; flex-shrink: 0; }
+.searchBar input { border: none; background: transparent; outline: none; font-size: 0.875rem; color: #1f2937; width: 100%; }
+.filterTabs { display: flex; gap: 0.25rem; padding: 0 1rem 0.5rem; flex-wrap: wrap; }
+.filterTab { padding: 0.35rem 0.7rem; font-size: 0.78rem; font-weight: 500; border-radius: 20px; border: 1.5px solid #e5e7eb; background: transparent; color: #6b7280; cursor: pointer; transition: all 0.2s; }
+.activeTab { background: #667eea !important; border-color: #667eea !important; color: #fff !important; }
+.convList { flex: 1; overflow-y: auto; }
+.convItem { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1rem; cursor: pointer; transition: background 0.15s; border-bottom: 1px solid #f9fafb; }
+.convItem:hover { background: #f9fafb; }
+.convActive { background: #ede9fe !important; border-left: 3px solid #667eea; }
+.convAvatar { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; font-size: 0.875rem; font-weight: 700; color: #fff; flex-shrink: 0; position: relative; overflow: hidden; }
+.convAvatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.onlineDot { position: absolute; bottom: 2px; right: 2px; width: 10px; height: 10px; background: #10b981; border: 2px solid #fff; border-radius: 50%; }
+.convInfo { flex: 1; min-width: 0; }
+.convTopRow { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.2rem; }
+.convName { font-weight: 600; font-size: 0.875rem; color: #1f2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.convTime { font-size: 0.75rem; color: #9ca3af; flex-shrink: 0; }
+.convPreview { font-size: 0.8rem; color: #6b7280; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.emptyConv { display: flex; flex-direction: column; align-items: center; padding: 2rem 1rem; color: #9ca3af; gap: 0.5rem; }
+.emptyConv svg { width: 40px; height: 40px; }
+.emptyConv p { font-size: 0.875rem; }
+.noChatSelected { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #9ca3af; gap: 0.75rem; }
+.noChatSelected svg { width: 56px; height: 56px; }
+.chatHeaderInfo { display: flex; align-items: center; gap: 0.75rem; }
+.chatAvatar { width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 0.875rem; overflow: hidden; flex-shrink: 0; }
+.chatAvatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.chatName { font-weight: 600; font-size: 0.9rem; color: #1f2937; margin: 0; }
+.chatStatus { font-size: 0.78rem; color: #6b7280; margin: 0; }
+.chatHeaderActions { display: flex; gap: 0.5rem; }
+.chatLoading, .chatEmpty { text-align: center; color: #9ca3af; padding: 2rem; font-size: 0.875rem; }
+.dateSeparator { display: flex; align-items: center; justify-content: center; margin: 0.5rem 0; }
+.dateSeparator span { background: #e5e7eb; color: #6b7280; font-size: 0.75rem; font-weight: 500; padding: 0.25rem 0.75rem; border-radius: 12px; }
+.messageGroup { display: flex; align-items: flex-end; gap: 0.5rem; }
+.messageGroup.sent { justify-content: flex-end; }
+.messageGroup.received { justify-content: flex-start; }
+.msgAvatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; overflow: hidden; }
+.msgAvatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.messageContent { display: flex; flex-direction: column; max-width: 65%; }
+.sent .messageContent { align-items: flex-end; }
+.received .messageContent { align-items: flex-start; }
+.messageBubble { padding: 0.625rem 0.875rem; border-radius: 16px; font-size: 0.875rem; line-height: 1.5; word-break: break-word; }
+.sent .messageBubble { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border-bottom-right-radius: 4px; }
+.received .messageBubble { background: #fff; color: #1f2937; border: 1px solid #e5e7eb; border-bottom-left-radius: 4px; }
+.messageTime { font-size: 0.7rem; color: #9ca3af; margin-top: 0.2rem; }
+.readStatus { font-size: 0.7rem; color: #667eea; }
+.chatInputBar { display: flex; align-items: flex-end; gap: 0.75rem; padding: 0.875rem 1.5rem; background: #fff; border-top: 1px solid #f0f0f0; }
+.chatInput { flex: 1; padding: 0.625rem 1rem; border: 1.5px solid #e5e7eb; border-radius: 12px; font-size: 0.875rem; color: #1f2937; background: #f9fafb; resize: none; outline: none; font-family: inherit; line-height: 1.5; transition: border-color 0.2s; }
+.chatInput:focus { border-color: #667eea; background: #fff; }
+.sendBtn { width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg, #667eea, #764ba2); border: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: opacity 0.2s; }
+.sendBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.sendBtn svg { width: 18px; height: 18px; }
+
 .quickActionsHeader {
   padding: var(--space-5);
   border-bottom: 1px solid var(--color-neutral-100);
