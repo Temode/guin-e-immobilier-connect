@@ -7,18 +7,20 @@ import {
 } from 'lucide-react';
 import { getPropertyById, type PropertyData } from '@/services/propertyService';
 import { supabase } from '@/integrations/supabase/client';
+import { getOrCreateConversation } from '@/services/messagingService';
 import styles from './PropertyDetail.module.css';
 
 const PropertyDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [property, setProperty] = useState<PropertyData | null>(null);
-  const [owner, setOwner] = useState<{ full_name: string | null; phone: string | null; avatar_url: string | null } | null>(null);
+  const [owner, setOwner] = useState<{ full_name: string | null; phone: string | null; avatar_url: string | null; id?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [showShareToast, setShowShareToast] = useState(false);
+  const [contactingAgent, setContactingAgent] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -35,7 +37,7 @@ const PropertyDetail = () => {
       // Fetch owner profile
       const { data: profile } = await supabase
         .from('profiles')
-        .select('full_name, phone, avatar_url')
+        .select('full_name, phone, avatar_url, id')
         .eq('id', (data as any).owner_id)
         .single();
       if (profile) setOwner(profile);
@@ -69,6 +71,20 @@ const PropertyDetail = () => {
   const openLightbox = (index: number) => {
     setLightboxIndex(index);
     setLightboxOpen(true);
+  };
+
+  const handleContactOwner = async () => {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) {
+      navigate('/auth');
+      return;
+    }
+    if (!owner?.id) return;
+    setContactingAgent(true);
+    const currentUserId = session.session.user.id;
+    await getOrCreateConversation(currentUserId, owner.id);
+    setContactingAgent(false);
+    navigate('/dashboard-locataire/messages');
   };
 
   return (
@@ -219,8 +235,8 @@ const PropertyDetail = () => {
               <CheckCircle /> Vérifié
             </div>
             <div className={styles.agentActions}>
-              <button className={styles.btnPrimary}>
-                <MessageCircle /> Contacter
+              <button className={styles.btnPrimary} onClick={handleContactOwner} disabled={contactingAgent}>
+                <MessageCircle /> {contactingAgent ? 'Ouverture...' : 'Contacter'}
               </button>
               {owner?.phone && (
                 <button className={styles.btnOutline} onClick={() => window.open(`tel:${owner.phone}`)}>

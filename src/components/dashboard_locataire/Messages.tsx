@@ -1,49 +1,21 @@
 // @ts-nocheck
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
 import styles from './Messages.module.css';
-import { useMessages } from '@/hooks/useMessages';
-import { useAuthContext } from '../../context/AuthContext';
+import { useAuthContext } from '@/context/AuthContext';
+import {
+  getUserConversations,
+  getConversationMessages,
+  sendMessage,
+  markMessagesAsRead,
+  subscribeToMessages,
+  subscribeToConversations,
+  type Conversation,
+  type Message,
+} from '@/services/messagingService';
 
 /* ==========================================
    ICONS COMPONENTS
 ========================================== */
-const HomeIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-  </svg>
-);
-
-const DashboardIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-  </svg>
-);
-
-const PaymentIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const DocumentIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-  </svg>
-);
-
-const MessageIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-  </svg>
-);
-
-const NotificationIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-  </svg>
-);
-
 const SearchIcon = ({ className }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -57,9 +29,9 @@ const SettingsIcon = ({ className }) => (
   </svg>
 );
 
-const CheckIcon = ({ className }) => (
+const SendIcon = ({ className }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
   </svg>
 );
 
@@ -69,762 +41,405 @@ const VerifiedBadgeIcon = ({ className }) => (
   </svg>
 );
 
-const DownloadIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-  </svg>
-);
-
 const PhoneIcon = ({ className }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
   </svg>
 );
 
-const DotsVerticalIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+const EmptyIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
   </svg>
 );
 
-const AttachmentIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-  </svg>
-);
+/* ==========================================
+   HELPERS
+========================================== */
+function getInitials(name: string | null): string {
+  if (!name) return '?';
+  return name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
+}
 
-const ImageIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-  </svg>
-);
+function formatTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  if (isToday) return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return 'Hier';
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+}
 
-const SendIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-  </svg>
-);
+function formatDateSeparator(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return "Aujourd'hui";
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return 'Hier';
+  return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+}
 
-const ClockIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const WarningIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-  </svg>
-);
-
-const QuestionIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-
-const UserIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-  </svg>
-);
-
-const FileIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-  </svg>
-);
+function groupMessagesByDate(messages: Message[]): Array<{ type: 'date'; text: string } | { type: 'message'; msg: Message }> {
+  const result: Array<{ type: 'date'; text: string } | { type: 'message'; msg: Message }> = [];
+  let lastDate = '';
+  for (const msg of messages) {
+    const date = new Date(msg.created_at).toDateString();
+    if (date !== lastDate) {
+      result.push({ type: 'date', text: formatDateSeparator(msg.created_at) });
+      lastDate = date;
+    }
+    result.push({ type: 'message', msg });
+  }
+  return result;
+}
 
 /* ==========================================
    HEADER COMPONENT
 ========================================== */
-const Header = ({ date }) => {
-  return (
-    <header className={styles.header}>
+const Header = ({ date }) => (
+  <header className={styles.header}>
+    <div className={styles.headerLeft}>
       <nav className={styles.breadcrumb}>
-        <a href="#">Tableau de bord</a>
-        <span className={styles.breadcrumbSeparator}>/</span>
+        <span>ImmoGN</span>
+        <span className={styles.breadcrumbSep}>›</span>
         <span className={styles.breadcrumbCurrent}>Messages</span>
       </nav>
-      <div className={styles.headerRight}>
-        <span className={styles.headerDate}>{date}</span>
-        <button className={styles.headerBtn}>
-          <SettingsIcon />
-        </button>
-      </div>
-    </header>
-  );
-};
+      <h1 className={styles.pageTitle}>Messages</h1>
+    </div>
+    <div className={styles.headerRight}>
+      <span className={styles.headerDate}>{date}</span>
+      <button className={styles.headerBtn}><SettingsIcon /></button>
+    </div>
+  </header>
+);
 
 /* ==========================================
-   CONVERSATIONS PANEL COMPONENT
+   CONVERSATIONS PANEL
 ========================================== */
-const ConversationsPanel = ({ 
-  conversations, 
-  activeConversationId, 
+const ConversationsPanel = ({
+  conversations,
+  activeConversationId,
   onSelectConversation,
   searchQuery,
   onSearchChange,
   activeFilter,
   onFilterChange,
-  unreadCount
+  unreadCount,
+  currentUserId,
 }) => {
-  const filters = ['Tous', 'Non lus', 'Agents', 'Support'];
+  const filters = [
+    { id: 'Tous', label: 'Tous' },
+    { id: 'Non lus', label: `Non lus${unreadCount > 0 ? ` (${unreadCount})` : ''}` },
+    { id: 'Agents', label: 'Agents' },
+  ];
+
+  const filtered = conversations.filter((conv) => {
+    const otherParticipant = conv.participants?.find((p) => p.user_id !== currentUserId);
+    const name = otherParticipant?.profile?.full_name || '';
+    const lastMsg = conv.last_message_text || '';
+
+    const matchesSearch = !searchQuery ||
+      name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      lastMsg.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // For filter - we'll treat all as 'Agents' since tenant talks to agent
+    const matchesFilter =
+      activeFilter === 'Tous' ||
+      (activeFilter === 'Non lus' /* TODO: track unread per conv */) ||
+      activeFilter === 'Agents';
+
+    return matchesSearch;
+  });
 
   return (
     <div className={styles.conversationsPanel}>
       <div className={styles.conversationsHeader}>
-        <h2>
-          Conversations
-          <span className={styles.unreadCount}>{unreadCount} non lus</span>
-        </h2>
-        <div className={styles.searchConversations}>
-          <SearchIcon />
-          <input
-            type="text"
-            placeholder="Rechercher une conversation..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-          />
-        </div>
+        <h3>Conversations</h3>
       </div>
-
-      <div className={styles.conversationsFilters}>
-        {filters.map((filter) => (
+      <div className={styles.searchBar}>
+        <SearchIcon />
+        <input
+          type="text"
+          placeholder="Rechercher un message..."
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+        />
+      </div>
+      <div className={styles.filterTabs}>
+        {filters.map((f) => (
           <button
-            key={filter}
-            className={`${styles.filterTab} ${activeFilter === filter ? styles.active : ''}`}
-            onClick={() => onFilterChange(filter)}
+            key={f.id}
+            className={`${styles.filterTab} ${activeFilter === f.id ? styles.activeTab : ''}`}
+            onClick={() => onFilterChange(f.id)}
           >
-            {filter}
+            {f.label}
           </button>
         ))}
       </div>
-
-      <div className={styles.conversationsList}>
-        {conversations.map((conv) => (
-          <div
-            key={conv.id}
-            className={`${styles.conversationItem} ${conv.id === activeConversationId ? styles.active : ''} ${conv.unread ? styles.unread : ''}`}
-            onClick={() => onSelectConversation(conv.id)}
-          >
-            <div className={`${styles.conversationAvatar} ${styles[conv.avatarType]}`}>
-              <span>{conv.initials}</span>
-              <span className={`${styles.avatarStatus} ${conv.online ? styles.online : styles.offline}`}></span>
-            </div>
-            <div className={styles.conversationContent}>
-              <div className={styles.conversationHeader}>
-                <span className={styles.conversationName}>
-                  {conv.name}
-                  {conv.verified && <VerifiedBadgeIcon className={styles.verifiedIcon} />}
-                </span>
-                <span className={styles.conversationTime}>{conv.time}</span>
-              </div>
-              <p className={styles.conversationPreview}>
-                {conv.badge && (
-                  <span className={`${styles.conversationBadge} ${styles[conv.badge.type]}`}>
-                    {conv.badge.label}
-                  </span>
-                )}
-                {conv.preview}
-              </p>
-            </div>
+      <div className={styles.convList}>
+        {filtered.length === 0 ? (
+          <div className={styles.emptyConv}>
+            <EmptyIcon />
+            <p>Aucune conversation</p>
           </div>
-        ))}
+        ) : (
+          filtered.map((conv) => {
+            const other = conv.participants?.find((p) => p.user_id !== currentUserId);
+            const name = other?.profile?.full_name || 'Utilisateur';
+            const initials = getInitials(name);
+            const isActive = conv.id === activeConversationId;
+            return (
+              <div
+                key={conv.id}
+                className={`${styles.convItem} ${isActive ? styles.convActive : ''}`}
+                onClick={() => onSelectConversation(conv.id)}
+              >
+                <div className={styles.convAvatar}>
+                  {other?.profile?.avatar_url ? (
+                    <img src={other.profile.avatar_url} alt={name} />
+                  ) : (
+                    <span>{initials}</span>
+                  )}
+                  <div className={styles.onlineDot}></div>
+                </div>
+                <div className={styles.convInfo}>
+                  <div className={styles.convTopRow}>
+                    <span className={styles.convName}>{name}</span>
+                    <span className={styles.convTime}>
+                      {conv.last_message_at ? formatTime(conv.last_message_at) : ''}
+                    </span>
+                  </div>
+                  <p className={styles.convPreview}>
+                    {conv.last_message_text || 'Démarrez la conversation'}
+                  </p>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );
 };
 
 /* ==========================================
-   CHAT PANEL COMPONENT
+   CHAT PANEL
 ========================================== */
-const ChatPanel = ({ activeContact, messages, onSendMessage }) => {
-  const [messageText, setMessageText] = useState('');
+const ChatPanel = ({ conversation, messages, currentUserId, onSendMessage, loading, otherParticipant }) => {
+  const [text, setText] = useState('');
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const handleSend = () => {
-    if (messageText.trim()) {
-      onSendMessage(messageText);
-      setMessageText('');
-    }
+    if (!text.trim()) return;
+    onSendMessage(text.trim());
+    setText('');
   };
 
-  const handleKeyPress = (e) => {
+  const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
 
-  return (
-    <div className={styles.chatPanel}>
-      <div className={styles.chatHeader}>
-        <div className={styles.chatHeaderLeft}>
-          <div className={styles.chatAvatar}>{activeContact.initials}</div>
-          <div className={styles.chatInfo}>
-            <h3>
-              {activeContact.name}
-              {activeContact.verified && <VerifiedBadgeIcon className={styles.verifiedIcon} />}
-            </h3>
-            <p>
-              <span className={styles.statusDot}></span>
-              {activeContact.status} • {activeContact.role}
-            </p>
-          </div>
-        </div>
-        <div className={styles.chatHeaderActions}>
-          <button className={styles.chatActionBtn}>
-            <PhoneIcon />
-          </button>
-          <button className={styles.chatActionBtn}>
-            <DotsVerticalIcon />
-          </button>
-        </div>
-      </div>
+  const otherName = otherParticipant?.profile?.full_name || 'Utilisateur';
+  const otherInitials = getInitials(otherName);
+  const grouped = groupMessagesByDate(messages);
 
-      <div className={styles.chatMessages}>
-        {messages.map((group, groupIndex) => (
-          <React.Fragment key={groupIndex}>
-            {group.dateSeparator && (
-              <div className={styles.messageDateSeparator}>
-                <span>{group.dateSeparator}</span>
-              </div>
-            )}
-            {group.items.map((msg, msgIndex) => (
-              <div key={msgIndex} className={`${styles.message} ${styles[msg.type]}`}>
-                <div className={styles.messageAvatar}>{msg.initials}</div>
-                <div className={styles.messageContent}>
-                  <div className={styles.messageBubble}>{msg.text}</div>
-                  {msg.attachment && (
-                    <div className={styles.messageAttachment}>
-                      <div className={styles.attachmentIcon}>
-                        <ImageIcon />
-                      </div>
-                      <div className={styles.attachmentInfo}>
-                        <p className={styles.attachmentName}>{msg.attachment.name}</p>
-                        <p className={styles.attachmentSize}>{msg.attachment.size}</p>
-                      </div>
-                      <button className={styles.attachmentDownload}>
-                        <DownloadIcon />
-                      </button>
-                    </div>
-                  )}
-                  <div className={styles.messageMeta}>
-                    <span>{msg.time}</span>
-                    {msg.status && (
-                      <span className={`${styles.messageStatus} ${styles[msg.status]}`}>
-                        <CheckIcon />
-                        {msg.status === 'read' && <CheckIcon style={{ marginLeft: '-8px' }} />}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </React.Fragment>
-        ))}
-      </div>
-
-      <div className={styles.chatInputContainer}>
-        <div className={styles.chatInputWrapper}>
-          <div className={styles.chatInputActions}>
-            <button className={styles.inputActionBtn}>
-              <AttachmentIcon />
-            </button>
-            <button className={styles.inputActionBtn}>
-              <ImageIcon />
-            </button>
-          </div>
-          <textarea
-            className={styles.chatInput}
-            rows="1"
-            placeholder="Écrivez votre message..."
-            value={messageText}
-            onChange={(e) => setMessageText(e.target.value)}
-            onKeyPress={handleKeyPress}
-          />
-          <button 
-            className={styles.sendBtn} 
-            onClick={handleSend}
-            disabled={!messageText.trim()}
-          >
-            <SendIcon />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/* ==========================================
-   QUICK ACTIONS PANEL COMPONENT
-========================================== */
-const QuickActionsPanel = ({ contact, templates, sharedFiles, onTemplateClick }) => {
-  return (
-    <div className={styles.quickActionsPanel}>
-      <div className={styles.quickActionsHeader}>
-        <h3>Informations</h3>
-      </div>
-      <div className={styles.quickActionsContent}>
-        <div className={styles.contactCard}>
-          <div className={styles.contactCardAvatar}>{contact.initials}</div>
-          <h4>{contact.name}</h4>
-          <p className={styles.contactCardRole}>{contact.role}</p>
-          <span className={styles.contactCardVerified}>
-            <VerifiedBadgeIcon />
-            Identité vérifiée
-          </span>
-          <div className={styles.contactCardActions}>
-            <button className={`${styles.contactCardBtn} ${styles.secondary}`}>
-              <PhoneIcon />
-              Appeler
-            </button>
-            <button className={`${styles.contactCardBtn} ${styles.primary}`}>
-              <UserIcon />
-              Profil
-            </button>
-          </div>
-        </div>
-
-        <div className={styles.quickTemplates}>
-          <h4>Réponses rapides</h4>
-          {templates.map((template, index) => {
-            const IconComponent = {
-              check: CheckIcon,
-              clock: ClockIcon,
-              warning: WarningIcon,
-              question: QuestionIcon,
-            }[template.icon] || CheckIcon;
-
-            return (
-              <button
-                key={index}
-                className={`${styles.templateBtn} ${template.gold ? styles.gold : ''}`}
-                onClick={() => onTemplateClick(template.text)}
-              >
-                <IconComponent />
-                {template.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className={styles.sharedFiles}>
-          <h4>Fichiers partagés</h4>
-          {sharedFiles.map((file, index) => (
-            <div key={index} className={styles.sharedFileItem}>
-              <div className={`${styles.sharedFileIcon} ${styles[file.type]}`}>
-                {file.type === 'img' ? <ImageIcon /> : <FileIcon />}
-              </div>
-              <div className={styles.sharedFileInfo}>
-                <p className={styles.sharedFileName}>{file.name}</p>
-                <p className={styles.sharedFileMeta}>{file.size} • {file.date}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/* ==========================================
-   HELPER FUNCTIONS
-========================================== */
-
-/**
- * Derive initials from a full name string.
- * e.g. "Abdoulaye Diallo" => "AD", "Jean" => "JE", null => "??"
- */
-function getInitials(fullName) {
-  if (!fullName) return '??';
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return fullName.slice(0, 2).toUpperCase();
-}
-
-/**
- * Format a date string for the conversation list time display.
- * Shows "HH:MM" for today, "Hier" for yesterday, or "DD Mon" otherwise.
- */
-function formatConversationTime(dateStr) {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  if (date >= today) {
-    return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-  }
-  if (date >= yesterday) {
-    return 'Hier';
-  }
-  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-}
-
-/**
- * Format a date string for message time display (HH:MM).
- */
-function formatMessageTime(dateStr) {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-}
-
-/**
- * Format a date for the date separator in chat.
- * Returns "Aujourd'hui", "Hier", or "DD MMMM YYYY".
- */
-function formatDateSeparator(dateStr) {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-  if (msgDay.getTime() === today.getTime()) return "Aujourd'hui";
-  if (msgDay.getTime() === yesterday.getTime()) return 'Hier';
-  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-}
-
-/**
- * Format the current date for the Header component.
- */
-function formatHeaderDate() {
-  const now = new Date();
-  const days = ['Dim.', 'Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.'];
-  const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-  return `${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
-}
-
-/* ==========================================
-   MOCK / FALLBACK DATA
-========================================== */
-const mockConversations = [
-  {
-    id: 'mock-1',
-    name: 'Abdoulaye Diallo',
-    initials: 'AD',
-    avatarType: 'agent',
-    verified: true,
-    online: true,
-    time: '10:32',
-    preview: "D'accord, je vais programmer l'intervention...",
-    badge: { type: 'agent', label: 'Agent' },
-    unread: false,
-  },
-  {
-    id: 'mock-2',
-    name: 'Support ImmoGN',
-    initials: 'SP',
-    avatarType: 'support',
-    verified: false,
-    online: true,
-    time: 'Hier',
-    preview: "Votre document d'identité expire bientôt...",
-    badge: { type: 'urgent', label: 'Urgent' },
-    unread: true,
-  },
-  {
-    id: 'mock-3',
-    name: 'M. Sow (Propriétaire)',
-    initials: 'MS',
-    avatarType: 'owner',
-    verified: false,
-    online: false,
-    time: '28 Jan',
-    preview: 'Merci pour votre paiement régulier...',
-    badge: null,
-    unread: true,
-  },
-  {
-    id: 'mock-4',
-    name: 'Abdoulaye Diallo',
-    initials: 'AD',
-    avatarType: 'agent',
-    verified: false,
-    online: false,
-    time: '15 Jan',
-    preview: 'Votre état des lieux a été validé ✓',
-    badge: null,
-    unread: false,
-  },
-];
-
-const mockActiveContact = {
-  name: 'Abdoulaye Diallo',
-  initials: 'AD',
-  verified: true,
-  status: 'En ligne',
-  role: 'Agent immobilier',
-};
-
-const mockMessages = [
-  {
-    dateSeparator: "Aujourd'hui",
-    items: [
-      {
-        type: 'received',
-        initials: 'AD',
-        text: "Bonjour M. Bah, j'espère que vous allez bien. J'ai bien reçu votre signalement concernant la fuite d'eau dans la salle de bain.",
-        time: '09:45',
-      },
-      {
-        type: 'received',
-        initials: 'AD',
-        text: "Pouvez-vous m'envoyer une photo du problème pour que je puisse contacter le plombier avec tous les détails ?",
-        time: '09:46',
-      },
-      {
-        type: 'sent',
-        initials: 'MB',
-        text: 'Bonjour M. Diallo, merci pour votre réponse rapide. Voici les photos de la fuite sous le lavabo.',
-        time: '10:15',
-        status: 'read',
-        attachment: {
-          name: 'fuite_lavabo.jpg',
-          size: '2.4 Mo',
-        },
-      },
-      {
-        type: 'received',
-        initials: 'AD',
-        text: "Merci pour les photos, c'est très clair. Je vois le problème. D'accord, je vais programmer l'intervention du plombier pour demain matin entre 9h et 11h. Est-ce que ça vous convient ?",
-        time: '10:32',
-      },
-    ],
-  },
-];
-
-const defaultTemplates = [
-  { icon: 'check', label: 'Oui, ça me convient', text: 'Oui, ça me convient parfaitement.' },
-  { icon: 'clock', label: "Je préfère l'après-midi", text: "Je préfère l'après-midi si possible." },
-  { icon: 'warning', label: 'Signaler un problème urgent', text: "J'ai un problème urgent à signaler.", gold: true },
-  { icon: 'question', label: "J'ai une question", text: "J'aurais une question à vous poser." },
-];
-
-const defaultSharedFiles = [
-  { type: 'img', name: 'fuite_lavabo.jpg', size: '2.4 Mo', date: "Aujourd'hui" },
-  { type: 'pdf', name: 'etat_des_lieux.pdf', size: '1.2 Mo', date: '15 Jan' },
-];
-
-/* ==========================================
-   MAIN COMPONENT
-========================================== */
-const Messages = () => {
-  const { user, profile } = useAuthContext();
-  const location = useLocation();
-  const {
-    conversations: realConversations,
-    messages: realMessages,
-    activeConversationId,
-    loading,
-    setActiveConversationId,
-    sendMessage,
-    getOrCreateConversation,
-    markAsRead,
-  } = useMessages();
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState('Tous');
-  const navigationHandled = useRef(false);
-
-  // Handle incoming navigation state (from PropertyDetail or SearchProperty)
-  useEffect(() => {
-    const navState = location.state;
-    if (navState?.agentId && !navigationHandled.current) {
-      navigationHandled.current = true;
-      const propertyInfo = navState.propertyId
-        ? {
-            id: navState.propertyId,
-            title: navState.propertyTitle || '',
-            location: navState.propertyLocation || '',
-            price: String(navState.propertyPrice || ''),
-          }
-        : undefined;
-
-      getOrCreateConversation(navState.agentId, propertyInfo)
-        .then((conversationId) => {
-          setActiveConversationId(conversationId);
-        })
-        .catch((err) => {
-          console.error('Failed to get or create conversation:', err);
-        });
-    }
-  }, [location.state, getOrCreateConversation, setActiveConversationId]);
-
-  // Derive current user initials
-  const currentUserInitials = useMemo(() => {
-    return getInitials(profile?.full_name || user?.email);
-  }, [profile, user]);
-
-  // Determine if we have real data
-  const hasRealConversations = realConversations.length > 0;
-
-  // Map real conversations to the format expected by ConversationsPanel
-  const mappedConversations = useMemo(() => {
-    if (!hasRealConversations) return mockConversations;
-
-    return realConversations.map((conv) => {
-      const name = conv.other_participant?.full_name || 'Utilisateur';
-      const initials = getInitials(name);
-      const preview = conv.last_message?.content || (conv.property_title ? `Propriété: ${conv.property_title}` : 'Nouvelle conversation');
-      const time = conv.last_message
-        ? formatConversationTime(conv.last_message.created_at)
-        : formatConversationTime(conv.created_at);
-
-      return {
-        id: conv.id,
-        name,
-        initials,
-        avatarType: 'agent',
-        verified: false,
-        online: false,
-        time,
-        preview,
-        badge: conv.property_title ? { type: 'agent', label: 'Propriété' } : null,
-        unread: (conv.unread_count || 0) > 0,
-      };
-    });
-  }, [hasRealConversations, realConversations]);
-
-  // Find the active conversation from real data
-  const activeConv = useMemo(() => {
-    if (!hasRealConversations || !activeConversationId) return null;
-    return realConversations.find((c) => c.id === activeConversationId) || null;
-  }, [hasRealConversations, realConversations, activeConversationId]);
-
-  // Build the activeContact object for ChatPanel and QuickActionsPanel
-  const activeContact = useMemo(() => {
-    if (!activeConv) return mockActiveContact;
-
-    const name = activeConv.other_participant?.full_name || 'Utilisateur';
-    return {
-      name,
-      initials: getInitials(name),
-      verified: false,
-      status: 'En ligne',
-      role: activeConv.property_title ? `Propriété: ${activeConv.property_title}` : 'Contact',
-    };
-  }, [activeConv]);
-
-  // Map real messages into the grouped format expected by ChatPanel
-  const mappedMessages = useMemo(() => {
-    if (!hasRealConversations || !activeConversationId || realMessages.length === 0) {
-      // Show mock messages only when there are no real conversations at all
-      return hasRealConversations ? [] : mockMessages;
-    }
-
-    const currentUserId = user?.id;
-    const otherInitials = activeContact.initials;
-
-    // Group messages by date
-    const groups = [];
-    let currentDateLabel = null;
-    let currentGroup = null;
-
-    for (const msg of realMessages) {
-      const dateLabel = formatDateSeparator(msg.created_at);
-      if (dateLabel !== currentDateLabel) {
-        currentDateLabel = dateLabel;
-        currentGroup = { dateSeparator: dateLabel, items: [] };
-        groups.push(currentGroup);
-      }
-
-      const isSent = msg.sender_id === currentUserId;
-      currentGroup.items.push({
-        type: isSent ? 'sent' : 'received',
-        initials: isSent ? currentUserInitials : otherInitials,
-        text: msg.content,
-        time: formatMessageTime(msg.created_at),
-        status: isSent ? (msg.read_at ? 'read' : 'sent') : undefined,
-      });
-    }
-
-    return groups;
-  }, [hasRealConversations, activeConversationId, realMessages, user, activeContact, currentUserInitials]);
-
-  // Handle sending a message
-  const handleSendMessage = async (text) => {
-    if (hasRealConversations && activeConversationId) {
-      try {
-        await sendMessage(text);
-      } catch (err) {
-        console.error('Failed to send message:', err);
-      }
-    } else {
-      console.log('Send message (mock):', text);
-    }
-  };
-
-  // Handle template quick-reply click
-  const handleTemplateClick = (text) => {
-    handleSendMessage(text);
-  };
-
-  // Handle selecting a conversation
-  const handleSelectConversation = (id) => {
-    setActiveConversationId(id);
-    if (hasRealConversations) {
-      markAsRead(id).catch((err) => {
-        console.error('Failed to mark as read:', err);
-      });
-    }
-  };
-
-  // Compute unread count
-  const unreadCount = useMemo(() => {
-    return mappedConversations.filter((c) => c.unread).length;
-  }, [mappedConversations]);
-
-  // Loading state
-  if (loading) {
+  if (!conversation) {
     return (
-      <>
-        <Header date={formatHeaderDate()} />
-        <div className={styles.messagesContainer} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <p style={{ color: '#64748B', fontSize: '1rem' }}>Chargement des conversations...</p>
+      <div className={styles.chatPanel}>
+        <div className={styles.noChatSelected}>
+          <EmptyIcon />
+          <p>Sélectionnez une conversation pour afficher les messages</p>
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
-      <Header date={formatHeaderDate()} />
+    <div className={styles.chatPanel}>
+      <div className={styles.chatHeader}>
+        <div className={styles.chatHeaderInfo}>
+          <div className={styles.chatAvatar}>
+            {otherParticipant?.profile?.avatar_url ? (
+              <img src={otherParticipant.profile.avatar_url} alt={otherName} />
+            ) : (
+              <span>{otherInitials}</span>
+            )}
+          </div>
+          <div>
+            <p className={styles.chatName}>{otherName}</p>
+            <p className={styles.chatStatus}>Agent immobilier</p>
+          </div>
+        </div>
+        <div className={styles.chatHeaderActions}>
+          {otherParticipant?.profile?.phone && (
+            <a href={`tel:${otherParticipant.profile.phone}`} className={styles.headerBtn}>
+              <PhoneIcon />
+            </a>
+          )}
+        </div>
+      </div>
 
+      <div className={styles.chatMessages}>
+        {loading ? (
+          <div className={styles.chatLoading}>Chargement...</div>
+        ) : grouped.length === 0 ? (
+          <div className={styles.chatEmpty}>
+            <p>Démarrez la conversation en envoyant un message</p>
+          </div>
+        ) : (
+          grouped.map((item, i) => {
+            if (item.type === 'date') {
+              return <div key={i} className={styles.dateSeparator}><span>{item.text}</span></div>;
+            }
+            const msg = item.msg;
+            const isSent = msg.sender_id === currentUserId;
+            return (
+              <div key={msg.id} className={`${styles.messageGroup} ${isSent ? styles.sent : styles.received}`}>
+                {!isSent && (
+                  <div className={styles.msgAvatar}>
+                    {otherParticipant?.profile?.avatar_url ? (
+                      <img src={otherParticipant.profile.avatar_url} alt={otherName} />
+                    ) : (
+                      <span>{otherInitials}</span>
+                    )}
+                  </div>
+                )}
+                <div className={styles.messageContent}>
+                  <div className={styles.messageBubble}>{msg.content}</div>
+                  <span className={styles.messageTime}>
+                    {new Date(msg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    {isSent && <span className={styles.readStatus}>{msg.read ? ' ✓✓' : ' ✓'}</span>}
+                  </span>
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      <div className={styles.chatInputBar}>
+        <textarea
+          className={styles.chatInput}
+          placeholder="Écrire un message..."
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={1}
+        />
+        <button className={styles.sendBtn} onClick={handleSend} disabled={!text.trim()}>
+          <SendIcon />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ==========================================
+   MAIN MESSAGES COMPONENT
+========================================== */
+const Messages = () => {
+  const { user } = useAuthContext();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState('Tous');
+  const [loadingConvs, setLoadingConvs] = useState(true);
+  const [loadingMsgs, setLoadingMsgs] = useState(false);
+
+  const today = new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+
+  // Load conversations
+  const loadConversations = async () => {
+    if (!user) return;
+    const { data } = await getUserConversations(user.id);
+    setConversations(data || []);
+    setLoadingConvs(false);
+    if (data && data.length > 0 && !activeConversationId) {
+      setActiveConversationId(data[0].id);
+    }
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    loadConversations();
+
+    const unsub = subscribeToConversations(user.id, loadConversations);
+    return () => { supabase?.removeChannel?.(unsub); };
+  }, [user]);
+
+  // Load messages when active conversation changes
+  useEffect(() => {
+    if (!activeConversationId) return;
+    setLoadingMsgs(true);
+    getConversationMessages(activeConversationId).then(({ data }) => {
+      setMessages(data || []);
+      setLoadingMsgs(false);
+      if (user) markMessagesAsRead(activeConversationId, user.id);
+    });
+
+    const unsub = subscribeToMessages(activeConversationId, (newMsg) => {
+      setMessages((prev) => [...prev, newMsg]);
+      if (user) markMessagesAsRead(activeConversationId, user.id);
+    });
+
+    return () => { unsub?.unsubscribe?.(); };
+  }, [activeConversationId]);
+
+  const handleSendMessage = async (text: string) => {
+    if (!user || !activeConversationId) return;
+    const { data } = await sendMessage(activeConversationId, user.id, text);
+    if (data) {
+      setMessages((prev) => [...prev, data]);
+      // Refresh conversations to update last message
+      loadConversations();
+    }
+  };
+
+  const activeConversation = conversations.find((c) => c.id === activeConversationId) || null;
+  const otherParticipant = activeConversation?.participants?.find((p) => p.user_id !== user?.id);
+  const unreadCount = 0; // TODO: track per-conversation
+
+  return (
+    <>
+      <Header date={today} />
       <div className={styles.messagesContainer}>
         <ConversationsPanel
-          conversations={mappedConversations}
-          activeConversationId={hasRealConversations ? activeConversationId : (activeConversationId || mappedConversations[0]?.id)}
-          onSelectConversation={handleSelectConversation}
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          onSelectConversation={setActiveConversationId}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
           unreadCount={unreadCount}
+          currentUserId={user?.id}
         />
-
         <ChatPanel
-          activeContact={activeContact}
-          messages={mappedMessages}
+          conversation={activeConversation}
+          messages={messages}
+          currentUserId={user?.id}
           onSendMessage={handleSendMessage}
-        />
-
-        <QuickActionsPanel
-          contact={activeContact}
-          templates={defaultTemplates}
-          sharedFiles={defaultSharedFiles}
-          onTemplateClick={handleTemplateClick}
+          loading={loadingMsgs}
+          otherParticipant={otherParticipant}
         />
       </div>
     </>
   );
 };
+
+// Need supabase for cleanup
+import { supabase } from '@/integrations/supabase/client';
 
 export default Messages;
