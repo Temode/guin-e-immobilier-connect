@@ -103,7 +103,7 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
       // 3. Validate property exists and belongs to agent
       const { data: property, error: propErr } = await supabase
         .from('properties')
-        .select('id, title, city, commune, quartier, type, bedrooms, area, images')
+        .select('id, title, city, commune, quartier, type, bedrooms, area, images, owner_id')
         .eq('id', propertyId)
         .single();
 
