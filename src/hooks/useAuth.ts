@@ -81,6 +81,9 @@ export function useAuth() {
       })
       .catch((err) => {
         console.error('getSession error', err);
+        if (isMounted.current) {
+          setState({ user: null, session: null, loading: false, profile: null });
+        }
       })
       .finally(() => {
         initializingRef.current = false;

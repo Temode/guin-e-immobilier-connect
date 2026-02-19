@@ -15,7 +15,6 @@ import Documents from './components/dashboard_locataire/Documents';
 import Messages from './components/dashboard_locataire/Messages';
 import Notifications from './components/dashboard_locataire/Notifications';
 import SearchProperty from './components/dashboard_locataire/SearchProperty';
-import PropertyDetail from './components/dashboard_locataire/PropertyDetail';
 import ProfileSettings from './components/dashboard_locataire/ProfileSettings';
 import DashboardAgentLayout from './components/dashbord_demarcheur/shared/DashboardAgentLayout';
 import AgentDashboard from './components/dashbord_demarcheur/Agentdashboard';
@@ -66,7 +65,6 @@ export default function App() {
               <Route path="messages" element={<Messages />} />
               <Route path="notifications" element={<Notifications />} />
               <Route path="recherche" element={<SearchProperty />} />
-              <Route path="bien/:id" element={<PropertyDetail />} />
               <Route path="profil" element={<ProfileSettings />} />
             </Route>
 
