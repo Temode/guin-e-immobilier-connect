@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthContext } from '@/context/AuthContext';
 import styles from './AddTenantModal.module.css';
@@ -7,6 +7,16 @@ interface AddTenantModalProps {
   onClose: () => void;
   onSuccess: () => void;
   preselectedPropertyId?: string;
+}
+
+interface AvailableProperty {
+  id: string;
+  title: string;
+  city: string;
+  commune: string | null;
+  quartier: string | null;
+  type: string;
+  images: any;
 }
 
 const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenantModalProps) => {
@@ -23,6 +33,24 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
   const [step, setStep] = useState<'form' | 'confirm'>('form');
   const [tenantProfile, setTenantProfile] = useState<any>(null);
   const [propertyData, setPropertyData] = useState<any>(null);
+  const [availableProperties, setAvailableProperties] = useState<AvailableProperty[]>([]);
+  const [loadingProperties, setLoadingProperties] = useState(true);
+
+  useEffect(() => {
+    const fetchAvailableProperties = async () => {
+      if (!user) return;
+      setLoadingProperties(true);
+      const { data } = await supabase
+        .from('properties')
+        .select('id, title, city, commune, quartier, type, images')
+        .eq('owner_id', user.id)
+        .in('status', ['available', 'published'])
+        .order('created_at', { ascending: false });
+      setAvailableProperties(data || []);
+      setLoadingProperties(false);
+    };
+    fetchAvailableProperties();
+  }, [user]);
 
   const validateAndFetch = async () => {
     setError('');
@@ -173,15 +201,25 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
               </div>
 
               <div className={styles.formGroup + ' ' + styles.fullWidth}>
-                <label>ID du bien *</label>
-                <input
-                  type="text"
-                  placeholder="UUID du bien (ex: abc123...)"
+                <label>Bien à louer *</label>
+                <select
                   value={propertyId}
                   onChange={(e) => setPropertyId(e.target.value)}
                   className={styles.input}
-                />
-                <span className={styles.hint}>Copiez l'ID depuis la liste de vos biens</span>
+                  disabled={loadingProperties}
+                >
+                  <option value="">
+                    {loadingProperties ? 'Chargement des biens...' : availableProperties.length === 0 ? 'Aucun bien disponible' : '— Sélectionnez un bien —'}
+                  </option>
+                  {availableProperties.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title} — {[p.quartier, p.commune, p.city].filter(Boolean).join(', ')}
+                    </option>
+                  ))}
+                </select>
+                {availableProperties.length === 0 && !loadingProperties && (
+                  <span className={styles.hint}>Aucun bien avec le statut "disponible" trouvé. Vérifiez le statut de vos biens.</span>
+                )}
               </div>
 
               <div className={styles.formGroup}>
