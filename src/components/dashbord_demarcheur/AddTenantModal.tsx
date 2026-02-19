@@ -17,6 +17,7 @@ interface AvailableProperty {
   quartier: string | null;
   type: string;
   images: any;
+  price: number;
 }
 
 const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenantModalProps) => {
@@ -42,12 +43,17 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
       setLoadingProperties(true);
       const { data } = await supabase
         .from('properties')
-        .select('id, title, city, commune, quartier, type, images')
+        .select('id, title, city, commune, quartier, type, images, price')
         .eq('owner_id', user.id)
         .in('status', ['available', 'published'])
         .order('created_at', { ascending: false });
-      setAvailableProperties(data || []);
+      setAvailableProperties((data || []) as AvailableProperty[]);
       setLoadingProperties(false);
+      // If a property is preselected, auto-fill rent from its price
+      if (preselectedPropertyId && data) {
+        const preselected = data.find(p => p.id === preselectedPropertyId);
+        if (preselected) setRentAmount(String(preselected.price));
+      }
     };
     fetchAvailableProperties();
   }, [user]);
@@ -204,7 +210,13 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
                 <label>Bien à louer *</label>
                 <select
                   value={propertyId}
-                  onChange={(e) => setPropertyId(e.target.value)}
+                  onChange={(e) => {
+                    const selectedId = e.target.value;
+                    setPropertyId(selectedId);
+                    const selected = availableProperties.find(p => p.id === selectedId);
+                    if (selected) setRentAmount(String(selected.price));
+                    else setRentAmount('');
+                  }}
                   className={styles.input}
                   disabled={loadingProperties}
                 >
@@ -231,6 +243,9 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
                   onChange={(e) => setRentAmount(e.target.value)}
                   className={styles.input}
                 />
+                {propertyId && rentAmount && (
+                  <span className={styles.hint}>💡 Pré-rempli depuis le prix du bien — modifiable</span>
+                )}
               </div>
 
               <div className={styles.formGroup}>
