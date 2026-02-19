@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import styles from './AgentMessages.module.css';
+import { useMessages } from '@/hooks/useMessages';
+import { useAuthContext } from '../../context/AuthContext';
+import type { Conversation, Message } from '@/hooks/useMessages';
 
 /* ==========================================
    ICONS COMPONENTS
@@ -85,6 +88,267 @@ const DoubleCheckIcon = ({ className }: { className?: string }) => (
 );
 
 /* ==========================================
+   HELPER FUNCTIONS
+========================================== */
+
+/** Generate initials from a full name (e.g., "Mamadou Diallo" -> "MD") */
+function getInitials(fullName: string | null | undefined): string {
+  if (!fullName) return '??';
+  const words = fullName.trim().split(/\s+/);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return fullName.substring(0, 2).toUpperCase();
+}
+
+/** Format a date string for conversation list display (e.g., "14:32", "Hier", "Lun", "28 Jan") */
+function formatConversationTime(dateStr: string | undefined): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  // Same day: show time
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  // Yesterday
+  if (diffDays === 1) return 'Hier';
+
+  // Within the last week: show short day name
+  if (diffDays < 7) {
+    return date.toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '');
+  }
+
+  // Older: show day + month
+  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+}
+
+/** Format a date string for message time display (e.g., "14:32") */
+function formatMessageTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Format a date string for date separator (e.g., "Aujourd'hui", "Hier", "15 janvier 2025") */
+function formatDateSeparator(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+
+  if (date.toDateString() === now.toDateString()) return "Aujourd'hui";
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return 'Hier';
+
+  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/** Build property summary string from conversation data */
+function buildPropertySummary(conv: Conversation): string | undefined {
+  if (!conv.property_title && !conv.property_price) return undefined;
+  const parts: string[] = [];
+  if (conv.property_title) parts.push(conv.property_title);
+  if (conv.property_price) parts.push(conv.property_price);
+  return parts.join(' \u2022 ');
+}
+
+/** Map a Conversation from the hook to the shape expected by ConversationsPanel */
+function mapConversation(conv: Conversation) {
+  const name = conv.other_participant?.full_name || 'Utilisateur';
+  return {
+    id: conv.id,
+    name,
+    initials: getInitials(conv.other_participant?.full_name),
+    type: 'prospect' as const,
+    typeLabel: 'Prospect',
+    phone: '',
+    time: formatConversationTime(conv.last_message?.created_at || conv.updated_at),
+    property: buildPropertySummary(conv),
+    preview: conv.last_message?.content || 'Aucun message',
+    unread: (conv.unread_count ?? 0) > 0,
+    online: false,
+    propertyDetails: conv.property_title
+      ? { title: conv.property_title + (conv.property_location ? ' \u2022 ' + conv.property_location : ''), price: conv.property_price || '' }
+      : undefined,
+  };
+}
+
+interface ChatMessageItem {
+  type?: 'date';
+  text: string;
+  direction?: 'sent' | 'received';
+  time?: string;
+  read?: boolean;
+}
+
+/** Map raw messages into the format expected by ChatPanel (with date separators) */
+function mapMessagesToChat(msgs: Message[], currentUserId: string | undefined): ChatMessageItem[] {
+  if (!currentUserId) return [];
+  const result: ChatMessageItem[] = [];
+  let lastDateStr = '';
+
+  for (const msg of msgs) {
+    const msgDate = new Date(msg.created_at);
+    const dateKey = msgDate.toDateString();
+
+    if (dateKey !== lastDateStr) {
+      result.push({ type: 'date', text: formatDateSeparator(msg.created_at) });
+      lastDateStr = dateKey;
+    }
+
+    result.push({
+      direction: msg.sender_id === currentUserId ? 'sent' : 'received',
+      text: msg.content,
+      time: formatMessageTime(msg.created_at),
+      read: msg.sender_id === currentUserId ? msg.read_at !== null : undefined,
+    });
+  }
+
+  return result;
+}
+
+/* ==========================================
+   MOCK FALLBACK DATA
+========================================== */
+
+const MOCK_CONVERSATIONS = [
+  {
+    id: 'mock-1',
+    name: 'Mamadou Diallo',
+    initials: 'MD',
+    type: 'prospect' as const,
+    typeLabel: 'Prospect',
+    phone: '+224 620 12 34 56',
+    time: '14:32',
+    property: 'F3 Kip\u00e9 \u2022 2,5M GNF',
+    preview: 'Bonjour, le F3 est toujours disponible ?',
+    unread: true,
+    online: true,
+    propertyDetails: { title: 'Appartement F3 Meubl\u00e9 \u2022 Kip\u00e9', price: '2 500 000 GNF/mois' },
+  },
+  {
+    id: 'mock-2',
+    name: 'Aissatou Barry',
+    initials: 'AB',
+    type: 'prospect' as const,
+    typeLabel: 'Prospect',
+    phone: '+224 622 45 67 89',
+    time: '13:45',
+    property: 'Villa Lambanyi \u2022 4,8M GNF',
+    preview: "D'accord pour jeudi 10h, \u00e0 bient\u00f4t !",
+    unread: true,
+    online: false,
+    propertyDetails: { title: 'Villa F4 \u2022 Lambanyi', price: '4 800 000 GNF/mois' },
+  },
+  {
+    id: 'mock-3',
+    name: 'S\u00e9kou Camara',
+    initials: 'SC',
+    type: 'owner' as const,
+    typeLabel: 'Proprio',
+    phone: '+224 621 98 76 54',
+    time: '11:20',
+    property: '3 biens en gestion',
+    preview: "Avez-vous trouv\u00e9 un locataire pour la villa ?",
+    unread: false,
+    online: false,
+  },
+  {
+    id: 'mock-4',
+    name: 'Ibrahima Bah',
+    initials: 'IB',
+    type: 'prospect' as const,
+    typeLabel: 'Prospect',
+    phone: '+224 625 11 22 33',
+    time: 'Hier',
+    property: 'Studio Nongo \u2022 1,2M GNF',
+    preview: "Merci pour la visite, je r\u00e9fl\u00e9chis encore",
+    unread: false,
+    online: false,
+    propertyDetails: { title: 'Studio \u2022 Nongo', price: '1 200 000 GNF/mois' },
+  },
+  {
+    id: 'mock-5',
+    name: 'Fatoumata Keita',
+    initials: 'FK',
+    type: 'prospect' as const,
+    typeLabel: 'Nouveau',
+    phone: '+224 628 44 55 66',
+    time: 'Hier',
+    preview: "Bonjour, je cherche un appartement F2...",
+    unread: true,
+    online: false,
+  },
+  {
+    id: 'mock-6',
+    name: 'Ibrahima Sow',
+    initials: 'IS',
+    type: 'tenant' as const,
+    typeLabel: 'Locataire',
+    phone: '+224 626 33 44 55',
+    time: 'Lun',
+    property: 'Villa F5 Kip\u00e9 \u2022 6,5M GNF',
+    preview: "Le robinet de la cuisine fuit toujours...",
+    unread: false,
+    online: false,
+    propertyDetails: { title: 'Villa F5 \u2022 Kip\u00e9', price: '6 500 000 GNF/mois' },
+  },
+  {
+    id: 'mock-7',
+    name: 'Oumar Diallo',
+    initials: 'OD',
+    type: 'owner' as const,
+    typeLabel: 'Proprio',
+    phone: '+224 627 88 99 00',
+    time: 'Dim',
+    property: 'Studio Cosa \u2022 800K GNF',
+    preview: "Ok pour le renouvellement du mandat",
+    unread: false,
+    online: false,
+  },
+  {
+    id: 'mock-8',
+    name: 'Alpha Keita',
+    initials: 'AK',
+    type: 'prospect' as const,
+    typeLabel: 'Prospect',
+    phone: '+224 629 11 22 33',
+    time: '28 Jan',
+    property: 'Duplex Ratoma \u2022 3,2M GNF',
+    preview: "Je vous recontacte le mois prochain",
+    unread: false,
+    online: false,
+    propertyDetails: { title: 'Duplex \u2022 Ratoma', price: '3 200 000 GNF/mois' },
+  },
+];
+
+const MOCK_MESSAGES: ChatMessageItem[] = [
+  { type: 'date', text: 'Hier' },
+  { direction: 'received', text: "Bonjour Monsieur l'agent, je suis int\u00e9ress\u00e9 par l'appartement F3 \u00e0 Kip\u00e9 que j'ai vu sur ImmoGN.", time: '16:42' },
+  { direction: 'sent', text: "Bonjour M. Diallo ! Merci pour votre int\u00e9r\u00eat. Oui, cet appartement est toujours disponible. Il est meubl\u00e9 avec 3 chambres, salon, cuisine \u00e9quip\u00e9e et 2 salles de bain.", time: '16:45', read: true },
+  { direction: 'received', text: "Tr\u00e8s bien ! C'est combien le loyer mensuel ? Et il y a des charges en plus ?", time: '16:48' },
+  { direction: 'sent', text: "Le loyer est de 2 500 000 GNF par mois. Les charges (eau, \u00e9lectricit\u00e9) sont \u00e0 la charge du locataire. Il y a aussi une caution de 2 mois \u00e0 pr\u00e9voir.", time: '16:52', read: true },
+  { direction: 'received', text: "D'accord, c'est dans mon budget. Est-ce que je peux visiter l'appartement ?", time: '17:05' },
+  { direction: 'sent', text: "Bien s\u00fbr ! Je suis disponible demain mardi \u00e0 9h ou jeudi \u00e0 14h. Quelle date vous convient le mieux ?", time: '17:10', read: true },
+  { direction: 'received', text: "Demain mardi 9h me convient parfaitement. Vous pouvez m'envoyer l'adresse exacte ?", time: '17:15' },
+  { direction: 'sent', text: "Parfait ! L'adresse est : Cit\u00e9 Chemin de Fer, Immeuble B, 3\u00e8me \u00e9tage, Kip\u00e9. Je vous enverrai ma position sur WhatsApp demain matin. \u00c0 demain !", time: '17:20', read: true },
+  { type: 'date', text: "Aujourd'hui" },
+  { direction: 'received', text: "Bonjour, le F3 est toujours disponible ? Je voulais confirmer notre rendez-vous de ce matin.", time: '14:32' },
+];
+
+const QUICK_REPLIES = [
+  { text: '\u2705 Oui, disponible' },
+  { text: '\ud83d\udcc5 Confirmer RDV', gold: true },
+  { text: '\ud83d\udccd Envoyer adresse' },
+  { text: '\ud83d\ude4f Merci, \u00e0 bient\u00f4t' },
+  { text: '\ud83d\udcb0 Infos prix' },
+  { text: '\ud83d\udcde Je vous appelle' },
+];
+
+/* ==========================================
    TOP BAR COMPONENT
 ========================================== */
 const TopBar = () => (
@@ -165,8 +429,31 @@ const ConversationsPanel = ({ conversations, activeConversationId, onSelectConve
 /* ==========================================
    CHAT PANEL COMPONENT
 ========================================== */
-const ChatPanel = ({ conversation, messages, quickReplies }) => {
+const ChatPanel = ({ conversation, messages, quickReplies, onSend }: {
+  conversation: any;
+  messages: ChatMessageItem[];
+  quickReplies: { text: string; gold?: boolean }[];
+  onSend?: (content: string) => void;
+}) => {
   const [messageText, setMessageText] = useState('');
+
+  const handleSend = () => {
+    const text = messageText.trim();
+    if (!text) return;
+    if (onSend) onSend(text);
+    setMessageText('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  const handleQuickReply = (text: string) => {
+    if (onSend) onSend(text);
+  };
 
   if (!conversation) {
     return (
@@ -275,6 +562,7 @@ const ChatPanel = ({ conversation, messages, quickReplies }) => {
           <button
             key={index}
             className={`${styles.quickReply} ${reply.gold ? styles.gold : ''}`}
+            onClick={() => handleQuickReply(reply.text)}
           >
             {reply.text}
           </button>
@@ -290,6 +578,7 @@ const ChatPanel = ({ conversation, messages, quickReplies }) => {
               rows={1}
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
+              onKeyDown={handleKeyDown}
             />
             <div className={styles.chatInputActions}>
               <button className={styles.inputActionBtn} title="Joindre un fichier">
@@ -300,7 +589,7 @@ const ChatPanel = ({ conversation, messages, quickReplies }) => {
               </button>
             </div>
           </div>
-          <button className={styles.sendBtn}>
+          <button className={styles.sendBtn} onClick={handleSend}>
             <SendIcon />
           </button>
         </div>
@@ -313,206 +602,114 @@ const ChatPanel = ({ conversation, messages, quickReplies }) => {
    MAIN COMPONENT
 ========================================== */
 const AgentMessages = () => {
+  const { user } = useAuthContext();
+  const {
+    conversations: realConversations,
+    messages: realMessages,
+    activeConversationId: hookActiveConversationId,
+    loading,
+    setActiveConversationId: hookSetActiveConversationId,
+    sendMessage,
+    markAsRead,
+  } = useMessages();
+
   const [activeTab, setActiveTab] = useState('all');
-  const [activeConversationId, setActiveConversationId] = useState(1);
 
-  // Mock Data
-  const mockData = {
-    tabs: [
-      { id: 'all', label: 'Tous', count: 8 },
-      { id: 'prospects', label: 'Prospects', count: 5 },
-      { id: 'owners', label: 'Proprios', count: 2 },
-      { id: 'tenants', label: 'Locataires', count: 1 },
-    ],
-    conversations: [
-      {
-        id: 1,
-        name: 'Mamadou Diallo',
-        initials: 'MD',
-        type: 'prospect',
-        typeLabel: 'Prospect',
-        phone: '+224 620 12 34 56',
-        time: '14:32',
-        property: 'F3 Kipé • 2,5M GNF',
-        preview: 'Bonjour, le F3 est toujours disponible ?',
-        unread: true,
-        online: true,
-        propertyDetails: {
-          title: 'Appartement F3 Meublé • Kipé',
-          price: '2 500 000 GNF/mois',
-        },
-      },
-      {
-        id: 2,
-        name: 'Aissatou Barry',
-        initials: 'AB',
-        type: 'prospect',
-        typeLabel: 'Prospect',
-        phone: '+224 622 45 67 89',
-        time: '13:45',
-        property: 'Villa Lambanyi • 4,8M GNF',
-        preview: 'D\'accord pour jeudi 10h, à bientôt !',
-        unread: true,
-        online: false,
-        propertyDetails: {
-          title: 'Villa F4 • Lambanyi',
-          price: '4 800 000 GNF/mois',
-        },
-      },
-      {
-        id: 3,
-        name: 'Sékou Camara',
-        initials: 'SC',
-        type: 'owner',
-        typeLabel: 'Proprio',
-        phone: '+224 621 98 76 54',
-        time: '11:20',
-        property: '3 biens en gestion',
-        preview: 'Avez-vous trouvé un locataire pour la villa ?',
-        unread: false,
-        online: false,
-      },
-      {
-        id: 4,
-        name: 'Ibrahima Bah',
-        initials: 'IB',
-        type: 'prospect',
-        typeLabel: 'Prospect',
-        phone: '+224 625 11 22 33',
-        time: 'Hier',
-        property: 'Studio Nongo • 1,2M GNF',
-        preview: 'Merci pour la visite, je réfléchis encore',
-        unread: false,
-        online: false,
-        propertyDetails: {
-          title: 'Studio • Nongo',
-          price: '1 200 000 GNF/mois',
-        },
-      },
-      {
-        id: 5,
-        name: 'Fatoumata Keita',
-        initials: 'FK',
-        type: 'prospect',
-        typeLabel: 'Nouveau',
-        phone: '+224 628 44 55 66',
-        time: 'Hier',
-        preview: 'Bonjour, je cherche un appartement F2...',
-        unread: true,
-        online: false,
-      },
-      {
-        id: 6,
-        name: 'Ibrahima Sow',
-        initials: 'IS',
-        type: 'tenant',
-        typeLabel: 'Locataire',
-        phone: '+224 626 33 44 55',
-        time: 'Lun',
-        property: 'Villa F5 Kipé • 6,5M GNF',
-        preview: 'Le robinet de la cuisine fuit toujours...',
-        unread: false,
-        online: false,
-        propertyDetails: {
-          title: 'Villa F5 • Kipé',
-          price: '6 500 000 GNF/mois',
-        },
-      },
-      {
-        id: 7,
-        name: 'Oumar Diallo',
-        initials: 'OD',
-        type: 'owner',
-        typeLabel: 'Proprio',
-        phone: '+224 627 88 99 00',
-        time: 'Dim',
-        property: 'Studio Cosa • 800K GNF',
-        preview: 'Ok pour le renouvellement du mandat',
-        unread: false,
-        online: false,
-      },
-      {
-        id: 8,
-        name: 'Alpha Keita',
-        initials: 'AK',
-        type: 'prospect',
-        typeLabel: 'Prospect',
-        phone: '+224 629 11 22 33',
-        time: '28 Jan',
-        property: 'Duplex Ratoma • 3,2M GNF',
-        preview: 'Je vous recontacte le mois prochain',
-        unread: false,
-        online: false,
-        propertyDetails: {
-          title: 'Duplex • Ratoma',
-          price: '3 200 000 GNF/mois',
-        },
-      },
-    ],
-    messages: [
-      { type: 'date', text: 'Hier' },
-      {
-        direction: 'received',
-        text: 'Bonjour Monsieur l\'agent, je suis intéressé par l\'appartement F3 à Kipé que j\'ai vu sur ImmoGN.',
-        time: '16:42',
-      },
-      {
-        direction: 'sent',
-        text: 'Bonjour M. Diallo ! Merci pour votre intérêt. Oui, cet appartement est toujours disponible. Il est meublé avec 3 chambres, salon, cuisine équipée et 2 salles de bain.',
-        time: '16:45',
-        read: true,
-      },
-      {
-        direction: 'received',
-        text: 'Très bien ! C\'est combien le loyer mensuel ? Et il y a des charges en plus ?',
-        time: '16:48',
-      },
-      {
-        direction: 'sent',
-        text: 'Le loyer est de 2 500 000 GNF par mois. Les charges (eau, électricité) sont à la charge du locataire. Il y a aussi une caution de 2 mois à prévoir.',
-        time: '16:52',
-        read: true,
-      },
-      {
-        direction: 'received',
-        text: 'D\'accord, c\'est dans mon budget. Est-ce que je peux visiter l\'appartement ?',
-        time: '17:05',
-      },
-      {
-        direction: 'sent',
-        text: 'Bien sûr ! Je suis disponible demain mardi à 9h ou jeudi à 14h. Quelle date vous convient le mieux ?',
-        time: '17:10',
-        read: true,
-      },
-      {
-        direction: 'received',
-        text: 'Demain mardi 9h me convient parfaitement. Vous pouvez m\'envoyer l\'adresse exacte ?',
-        time: '17:15',
-      },
-      {
-        direction: 'sent',
-        text: 'Parfait ! L\'adresse est : Cité Chemin de Fer, Immeuble B, 3ème étage, Kipé. Je vous enverrai ma position sur WhatsApp demain matin. À demain !',
-        time: '17:20',
-        read: true,
-      },
-      { type: 'date', text: 'Aujourd\'hui' },
-      {
-        direction: 'received',
-        text: 'Bonjour, le F3 est toujours disponible ? Je voulais confirmer notre rendez-vous de ce matin.',
-        time: '14:32',
-      },
-    ],
-    quickReplies: [
-      { text: '✅ Oui, disponible' },
-      { text: '📅 Confirmer RDV', gold: true },
-      { text: '📍 Envoyer adresse' },
-      { text: '🙏 Merci, à bientôt' },
-      { text: '💰 Infos prix' },
-      { text: '📞 Je vous appelle' },
-    ],
-  };
+  // Determine whether we are using real data or mock fallback
+  const useRealData = realConversations.length > 0;
 
-  const activeConversation = mockData.conversations.find(c => c.id === activeConversationId);
+  // Map real conversations to the UI format
+  const mappedConversations = useMemo(() => {
+    if (!useRealData) return MOCK_CONVERSATIONS;
+    return realConversations.map(mapConversation);
+  }, [useRealData, realConversations]);
+
+  // Map real messages to the UI format (with date separators)
+  const mappedMessages = useMemo(() => {
+    if (!useRealData) return MOCK_MESSAGES;
+    return mapMessagesToChat(realMessages, user?.id);
+  }, [useRealData, realMessages, user?.id]);
+
+  // Active conversation ID: use the hook's value when real data is present,
+  // otherwise fall back to the first mock conversation
+  const [mockActiveId, setMockActiveId] = useState<string>(MOCK_CONVERSATIONS[0]?.id || '');
+  const activeConversationId = useRealData ? hookActiveConversationId : mockActiveId;
+
+  // Select conversation handler
+  const handleSelectConversation = useCallback(
+    (id: string) => {
+      if (useRealData) {
+        hookSetActiveConversationId(id);
+        markAsRead(id);
+      } else {
+        setMockActiveId(id);
+      }
+    },
+    [useRealData, hookSetActiveConversationId, markAsRead]
+  );
+
+  // Find the active conversation object
+  const activeConversation = mappedConversations.find(
+    (c) => c.id === activeConversationId
+  ) || null;
+
+  // Compute tab counts from mapped conversations
+  const tabs = useMemo(() => {
+    const all = mappedConversations.length;
+    const prospects = mappedConversations.filter((c) => c.type === 'prospect').length;
+    const owners = mappedConversations.filter((c) => c.type === 'owner').length;
+    const tenants = mappedConversations.filter((c) => c.type === 'tenant').length;
+    return [
+      { id: 'all', label: 'Tous', count: all },
+      { id: 'prospects', label: 'Prospects', count: prospects },
+      { id: 'owners', label: 'Proprios', count: owners },
+      { id: 'tenants', label: 'Locataires', count: tenants },
+    ];
+  }, [mappedConversations]);
+
+  // Filter conversations based on the active tab
+  const filteredConversations = useMemo(() => {
+    if (activeTab === 'all') return mappedConversations;
+    const typeMap: Record<string, string> = {
+      prospects: 'prospect',
+      owners: 'owner',
+      tenants: 'tenant',
+    };
+    const filterType = typeMap[activeTab];
+    if (!filterType) return mappedConversations;
+    return mappedConversations.filter((c) => c.type === filterType);
+  }, [mappedConversations, activeTab]);
+
+  // Send message handler
+  const handleSend = useCallback(
+    (content: string) => {
+      if (useRealData) {
+        sendMessage(content);
+      }
+      // In mock mode, sending is a no-op (messages are static demo data)
+    },
+    [useRealData, sendMessage]
+  );
+
+  // Loading state
+  if (loading) {
+    return (
+      <>
+        <TopBar />
+        <div className={styles.messagingContainer}>
+          <div className={styles.chatPanel}>
+            <div className={styles.emptyState}>
+              <div className={styles.emptyStateIcon}>
+                <MessageIcon />
+              </div>
+              <h3>Chargement...</h3>
+              <p>{"R\u00e9cup\u00e9ration de vos conversations en cours."}</p>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -520,18 +717,19 @@ const AgentMessages = () => {
 
       <div className={styles.messagingContainer}>
         <ConversationsPanel
-          conversations={mockData.conversations}
+          conversations={filteredConversations}
           activeConversationId={activeConversationId}
-          onSelectConversation={setActiveConversationId}
-          tabs={mockData.tabs}
+          onSelectConversation={handleSelectConversation}
+          tabs={tabs}
           activeTab={activeTab}
           onTabChange={setActiveTab}
         />
 
         <ChatPanel
           conversation={activeConversation}
-          messages={mockData.messages}
-          quickReplies={mockData.quickReplies}
+          messages={mappedMessages}
+          quickReplies={QUICK_REPLIES}
+          onSend={handleSend}
         />
       </div>
     </>

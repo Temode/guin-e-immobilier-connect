@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import styles from './SearchProperty.module.css';
 
 /* ==========================================
@@ -423,7 +424,7 @@ const AlertBanner = () => {
 /* ==========================================
    PROPERTY CARD COMPONENT
 ========================================== */
-const PropertyCard = ({ property, onFavoriteToggle }) => {
+const PropertyCard = ({ property, onFavoriteToggle, onCardClick, onContactClick }) => {
   const featureIcons = {
     rooms: HomeIcon,
     area: ExpandIcon,
@@ -436,7 +437,11 @@ const PropertyCard = ({ property, onFavoriteToggle }) => {
   };
 
   return (
-    <article className={`${styles.propertyCard} ${property.premium ? styles.premium : ''}`}>
+    <article
+      className={`${styles.propertyCard} ${property.premium ? styles.premium : ''}`}
+      onClick={() => onCardClick && onCardClick(property)}
+      style={{ cursor: 'pointer' }}
+    >
       <div className={styles.propertyImage}>
         <img src={property.image} alt={property.title} />
         {property.badges && property.badges.length > 0 && (
@@ -493,7 +498,15 @@ const PropertyCard = ({ property, onFavoriteToggle }) => {
               )}
             </div>
           </div>
-          <button className={styles.propertyContactBtn}>Contacter</button>
+          <button
+            className={styles.propertyContactBtn}
+            onClick={(e) => {
+              e.stopPropagation();
+              onContactClick && onContactClick(property);
+            }}
+          >
+            Contacter
+          </button>
         </div>
       </div>
     </article>
@@ -547,6 +560,7 @@ const Pagination = ({ currentPage, totalPages, onPageChange }) => {
    MAIN COMPONENT
 ========================================== */
 const SearchProperty = () => {
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState('grid');
   const [searchQuery, setSearchQuery] = useState('Ratoma, Conakry');
   const [activeFilters, setActiveFilters] = useState(['Ratoma, Conakry', 'Appartement', '1-3M GNF']);
@@ -680,6 +694,24 @@ const SearchProperty = () => {
     );
   };
 
+  const handleCardClick = (property) => {
+    navigate(`/dashboard-locataire/bien/${property.id}`, { state: { property } });
+  };
+
+  const handleContactClick = (property) => {
+    navigate('/dashboard-locataire/messages', {
+      state: {
+        agentId: `agent-${property.id}`,
+        agentName: property.agent.name,
+        agentInitials: property.agent.initials,
+        propertyId: String(property.id),
+        propertyTitle: property.title,
+        propertyLocation: property.location,
+        propertyPrice: String(property.price),
+      },
+    });
+  };
+
   const propertiesWithFavorites = mockData.properties.map((p) => ({
     ...p,
     isFavorite: favorites.includes(p.id),
@@ -733,6 +765,8 @@ const SearchProperty = () => {
                 key={property.id}
                 property={property}
                 onFavoriteToggle={handleFavoriteToggle}
+                onCardClick={handleCardClick}
+                onContactClick={handleContactClick}
               />
             ))}
           </div>

@@ -1,6 +1,9 @@
 // @ts-nocheck
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import styles from './Messages.module.css';
+import { useMessages } from '@/hooks/useMessages';
+import { useAuthContext } from '../../context/AuthContext';
 
 /* ==========================================
    ICONS COMPONENTS
@@ -426,144 +429,380 @@ const QuickActionsPanel = ({ contact, templates, sharedFiles, onTemplateClick })
 };
 
 /* ==========================================
+   HELPER FUNCTIONS
+========================================== */
+
+/**
+ * Derive initials from a full name string.
+ * e.g. "Abdoulaye Diallo" => "AD", "Jean" => "JE", null => "??"
+ */
+function getInitials(fullName) {
+  if (!fullName) return '??';
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return fullName.slice(0, 2).toUpperCase();
+}
+
+/**
+ * Format a date string for the conversation list time display.
+ * Shows "HH:MM" for today, "Hier" for yesterday, or "DD Mon" otherwise.
+ */
+function formatConversationTime(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (date >= today) {
+    return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+  if (date >= yesterday) {
+    return 'Hier';
+  }
+  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+}
+
+/**
+ * Format a date string for message time display (HH:MM).
+ */
+function formatMessageTime(dateStr) {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
+ * Format a date for the date separator in chat.
+ * Returns "Aujourd'hui", "Hier", or "DD MMMM YYYY".
+ */
+function formatDateSeparator(dateStr) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const msgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (msgDay.getTime() === today.getTime()) return "Aujourd'hui";
+  if (msgDay.getTime() === yesterday.getTime()) return 'Hier';
+  return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/**
+ * Format the current date for the Header component.
+ */
+function formatHeaderDate() {
+  const now = new Date();
+  const days = ['Dim.', 'Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.'];
+  const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+  return `${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+}
+
+/* ==========================================
+   MOCK / FALLBACK DATA
+========================================== */
+const mockConversations = [
+  {
+    id: 'mock-1',
+    name: 'Abdoulaye Diallo',
+    initials: 'AD',
+    avatarType: 'agent',
+    verified: true,
+    online: true,
+    time: '10:32',
+    preview: "D'accord, je vais programmer l'intervention...",
+    badge: { type: 'agent', label: 'Agent' },
+    unread: false,
+  },
+  {
+    id: 'mock-2',
+    name: 'Support ImmoGN',
+    initials: 'SP',
+    avatarType: 'support',
+    verified: false,
+    online: true,
+    time: 'Hier',
+    preview: "Votre document d'identité expire bientôt...",
+    badge: { type: 'urgent', label: 'Urgent' },
+    unread: true,
+  },
+  {
+    id: 'mock-3',
+    name: 'M. Sow (Propriétaire)',
+    initials: 'MS',
+    avatarType: 'owner',
+    verified: false,
+    online: false,
+    time: '28 Jan',
+    preview: 'Merci pour votre paiement régulier...',
+    badge: null,
+    unread: true,
+  },
+  {
+    id: 'mock-4',
+    name: 'Abdoulaye Diallo',
+    initials: 'AD',
+    avatarType: 'agent',
+    verified: false,
+    online: false,
+    time: '15 Jan',
+    preview: 'Votre état des lieux a été validé ✓',
+    badge: null,
+    unread: false,
+  },
+];
+
+const mockActiveContact = {
+  name: 'Abdoulaye Diallo',
+  initials: 'AD',
+  verified: true,
+  status: 'En ligne',
+  role: 'Agent immobilier',
+};
+
+const mockMessages = [
+  {
+    dateSeparator: "Aujourd'hui",
+    items: [
+      {
+        type: 'received',
+        initials: 'AD',
+        text: "Bonjour M. Bah, j'espère que vous allez bien. J'ai bien reçu votre signalement concernant la fuite d'eau dans la salle de bain.",
+        time: '09:45',
+      },
+      {
+        type: 'received',
+        initials: 'AD',
+        text: "Pouvez-vous m'envoyer une photo du problème pour que je puisse contacter le plombier avec tous les détails ?",
+        time: '09:46',
+      },
+      {
+        type: 'sent',
+        initials: 'MB',
+        text: 'Bonjour M. Diallo, merci pour votre réponse rapide. Voici les photos de la fuite sous le lavabo.',
+        time: '10:15',
+        status: 'read',
+        attachment: {
+          name: 'fuite_lavabo.jpg',
+          size: '2.4 Mo',
+        },
+      },
+      {
+        type: 'received',
+        initials: 'AD',
+        text: "Merci pour les photos, c'est très clair. Je vois le problème. D'accord, je vais programmer l'intervention du plombier pour demain matin entre 9h et 11h. Est-ce que ça vous convient ?",
+        time: '10:32',
+      },
+    ],
+  },
+];
+
+const defaultTemplates = [
+  { icon: 'check', label: 'Oui, ça me convient', text: 'Oui, ça me convient parfaitement.' },
+  { icon: 'clock', label: "Je préfère l'après-midi", text: "Je préfère l'après-midi si possible." },
+  { icon: 'warning', label: 'Signaler un problème urgent', text: "J'ai un problème urgent à signaler.", gold: true },
+  { icon: 'question', label: "J'ai une question", text: "J'aurais une question à vous poser." },
+];
+
+const defaultSharedFiles = [
+  { type: 'img', name: 'fuite_lavabo.jpg', size: '2.4 Mo', date: "Aujourd'hui" },
+  { type: 'pdf', name: 'etat_des_lieux.pdf', size: '1.2 Mo', date: '15 Jan' },
+];
+
+/* ==========================================
    MAIN COMPONENT
 ========================================== */
 const Messages = () => {
-  const [activeConversationId, setActiveConversationId] = useState(1);
+  const { user, profile } = useAuthContext();
+  const location = useLocation();
+  const {
+    conversations: realConversations,
+    messages: realMessages,
+    activeConversationId,
+    loading,
+    setActiveConversationId,
+    sendMessage,
+    getOrCreateConversation,
+    markAsRead,
+  } = useMessages();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('Tous');
+  const navigationHandled = useRef(false);
 
-  // Données mock
-  const mockData = {
-    user: {
-      name: 'Mamadou Bah',
-      role: 'Locataire',
-      verified: true,
-    },
-    conversations: [
-      {
-        id: 1,
-        name: 'Abdoulaye Diallo',
-        initials: 'AD',
+  // Handle incoming navigation state (from PropertyDetail or SearchProperty)
+  useEffect(() => {
+    const navState = location.state;
+    if (navState?.agentId && !navigationHandled.current) {
+      navigationHandled.current = true;
+      const propertyInfo = navState.propertyId
+        ? {
+            id: navState.propertyId,
+            title: navState.propertyTitle || '',
+            location: navState.propertyLocation || '',
+            price: String(navState.propertyPrice || ''),
+          }
+        : undefined;
+
+      getOrCreateConversation(navState.agentId, propertyInfo)
+        .then((conversationId) => {
+          setActiveConversationId(conversationId);
+        })
+        .catch((err) => {
+          console.error('Failed to get or create conversation:', err);
+        });
+    }
+  }, [location.state, getOrCreateConversation, setActiveConversationId]);
+
+  // Derive current user initials
+  const currentUserInitials = useMemo(() => {
+    return getInitials(profile?.full_name || user?.email);
+  }, [profile, user]);
+
+  // Determine if we have real data
+  const hasRealConversations = realConversations.length > 0;
+
+  // Map real conversations to the format expected by ConversationsPanel
+  const mappedConversations = useMemo(() => {
+    if (!hasRealConversations) return mockConversations;
+
+    return realConversations.map((conv) => {
+      const name = conv.other_participant?.full_name || 'Utilisateur';
+      const initials = getInitials(name);
+      const preview = conv.last_message?.content || (conv.property_title ? `Propriété: ${conv.property_title}` : 'Nouvelle conversation');
+      const time = conv.last_message
+        ? formatConversationTime(conv.last_message.created_at)
+        : formatConversationTime(conv.created_at);
+
+      return {
+        id: conv.id,
+        name,
+        initials,
         avatarType: 'agent',
-        verified: true,
-        online: true,
-        time: '10:32',
-        preview: "D'accord, je vais programmer l'intervention...",
-        badge: { type: 'agent', label: 'Agent' },
-        unread: false,
-      },
-      {
-        id: 2,
-        name: 'Support ImmoGN',
-        initials: 'SP',
-        avatarType: 'support',
-        verified: false,
-        online: true,
-        time: 'Hier',
-        preview: "Votre document d'identité expire bientôt...",
-        badge: { type: 'urgent', label: 'Urgent' },
-        unread: true,
-      },
-      {
-        id: 3,
-        name: 'M. Sow (Propriétaire)',
-        initials: 'MS',
-        avatarType: 'owner',
         verified: false,
         online: false,
-        time: '28 Jan',
-        preview: 'Merci pour votre paiement régulier...',
-        badge: null,
-        unread: true,
-      },
-      {
-        id: 4,
-        name: 'Abdoulaye Diallo',
-        initials: 'AD',
-        avatarType: 'agent',
-        verified: false,
-        online: false,
-        time: '15 Jan',
-        preview: 'Votre état des lieux a été validé ✓',
-        badge: null,
-        unread: false,
-      },
-    ],
-    activeContact: {
-      name: 'Abdoulaye Diallo',
-      initials: 'AD',
-      verified: true,
+        time,
+        preview,
+        badge: conv.property_title ? { type: 'agent', label: 'Propriété' } : null,
+        unread: (conv.unread_count || 0) > 0,
+      };
+    });
+  }, [hasRealConversations, realConversations]);
+
+  // Find the active conversation from real data
+  const activeConv = useMemo(() => {
+    if (!hasRealConversations || !activeConversationId) return null;
+    return realConversations.find((c) => c.id === activeConversationId) || null;
+  }, [hasRealConversations, realConversations, activeConversationId]);
+
+  // Build the activeContact object for ChatPanel and QuickActionsPanel
+  const activeContact = useMemo(() => {
+    if (!activeConv) return mockActiveContact;
+
+    const name = activeConv.other_participant?.full_name || 'Utilisateur';
+    return {
+      name,
+      initials: getInitials(name),
+      verified: false,
       status: 'En ligne',
-      role: 'Agent immobilier',
-    },
-    messages: [
-      {
-        dateSeparator: "Aujourd'hui",
-        items: [
-          {
-            type: 'received',
-            initials: 'AD',
-            text: "Bonjour M. Bah, j'espère que vous allez bien. J'ai bien reçu votre signalement concernant la fuite d'eau dans la salle de bain.",
-            time: '09:45',
-          },
-          {
-            type: 'received',
-            initials: 'AD',
-            text: "Pouvez-vous m'envoyer une photo du problème pour que je puisse contacter le plombier avec tous les détails ?",
-            time: '09:46',
-          },
-          {
-            type: 'sent',
-            initials: 'MB',
-            text: 'Bonjour M. Diallo, merci pour votre réponse rapide. Voici les photos de la fuite sous le lavabo.',
-            time: '10:15',
-            status: 'read',
-            attachment: {
-              name: 'fuite_lavabo.jpg',
-              size: '2.4 Mo',
-            },
-          },
-          {
-            type: 'received',
-            initials: 'AD',
-            text: "Merci pour les photos, c'est très clair. Je vois le problème. D'accord, je vais programmer l'intervention du plombier pour demain matin entre 9h et 11h. Est-ce que ça vous convient ?",
-            time: '10:32',
-          },
-        ],
-      },
-    ],
-    templates: [
-      { icon: 'check', label: 'Oui, ça me convient', text: 'Oui, ça me convient parfaitement.' },
-      { icon: 'clock', label: "Je préfère l'après-midi", text: "Je préfère l'après-midi si possible." },
-      { icon: 'warning', label: 'Signaler un problème urgent', text: "J'ai un problème urgent à signaler.", gold: true },
-      { icon: 'question', label: "J'ai une question", text: "J'aurais une question à vous poser." },
-    ],
-    sharedFiles: [
-      { type: 'img', name: 'fuite_lavabo.jpg', size: '2.4 Mo', date: "Aujourd'hui" },
-      { type: 'pdf', name: 'etat_des_lieux.pdf', size: '1.2 Mo', date: '15 Jan' },
-    ],
+      role: activeConv.property_title ? `Propriété: ${activeConv.property_title}` : 'Contact',
+    };
+  }, [activeConv]);
+
+  // Map real messages into the grouped format expected by ChatPanel
+  const mappedMessages = useMemo(() => {
+    if (!hasRealConversations || !activeConversationId || realMessages.length === 0) {
+      // Show mock messages only when there are no real conversations at all
+      return hasRealConversations ? [] : mockMessages;
+    }
+
+    const currentUserId = user?.id;
+    const otherInitials = activeContact.initials;
+
+    // Group messages by date
+    const groups = [];
+    let currentDateLabel = null;
+    let currentGroup = null;
+
+    for (const msg of realMessages) {
+      const dateLabel = formatDateSeparator(msg.created_at);
+      if (dateLabel !== currentDateLabel) {
+        currentDateLabel = dateLabel;
+        currentGroup = { dateSeparator: dateLabel, items: [] };
+        groups.push(currentGroup);
+      }
+
+      const isSent = msg.sender_id === currentUserId;
+      currentGroup.items.push({
+        type: isSent ? 'sent' : 'received',
+        initials: isSent ? currentUserInitials : otherInitials,
+        text: msg.content,
+        time: formatMessageTime(msg.created_at),
+        status: isSent ? (msg.read_at ? 'read' : 'sent') : undefined,
+      });
+    }
+
+    return groups;
+  }, [hasRealConversations, activeConversationId, realMessages, user, activeContact, currentUserInitials]);
+
+  // Handle sending a message
+  const handleSendMessage = async (text) => {
+    if (hasRealConversations && activeConversationId) {
+      try {
+        await sendMessage(text);
+      } catch (err) {
+        console.error('Failed to send message:', err);
+      }
+    } else {
+      console.log('Send message (mock):', text);
+    }
   };
 
-  const handleSendMessage = (text) => {
-    console.log('Send message:', text);
-  };
-
+  // Handle template quick-reply click
   const handleTemplateClick = (text) => {
-    console.log('Template clicked:', text);
+    handleSendMessage(text);
   };
 
-  const unreadCount = mockData.conversations.filter(c => c.unread).length;
+  // Handle selecting a conversation
+  const handleSelectConversation = (id) => {
+    setActiveConversationId(id);
+    if (hasRealConversations) {
+      markAsRead(id).catch((err) => {
+        console.error('Failed to mark as read:', err);
+      });
+    }
+  };
+
+  // Compute unread count
+  const unreadCount = useMemo(() => {
+    return mappedConversations.filter((c) => c.unread).length;
+  }, [mappedConversations]);
+
+  // Loading state
+  if (loading) {
+    return (
+      <>
+        <Header date={formatHeaderDate()} />
+        <div className={styles.messagesContainer} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <p style={{ color: '#64748B', fontSize: '1rem' }}>Chargement des conversations...</p>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
-      <Header date="Dim. 2 Février 2026" />
+      <Header date={formatHeaderDate()} />
 
       <div className={styles.messagesContainer}>
         <ConversationsPanel
-          conversations={mockData.conversations}
-          activeConversationId={activeConversationId}
-          onSelectConversation={setActiveConversationId}
+          conversations={mappedConversations}
+          activeConversationId={hasRealConversations ? activeConversationId : (activeConversationId || mappedConversations[0]?.id)}
+          onSelectConversation={handleSelectConversation}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           activeFilter={activeFilter}
@@ -572,15 +811,15 @@ const Messages = () => {
         />
 
         <ChatPanel
-          activeContact={mockData.activeContact}
-          messages={mockData.messages}
+          activeContact={activeContact}
+          messages={mappedMessages}
           onSendMessage={handleSendMessage}
         />
 
         <QuickActionsPanel
-          contact={mockData.activeContact}
-          templates={mockData.templates}
-          sharedFiles={mockData.sharedFiles}
+          contact={activeContact}
+          templates={defaultTemplates}
+          sharedFiles={defaultSharedFiles}
           onTemplateClick={handleTemplateClick}
         />
       </div>

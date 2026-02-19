@@ -14,6 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
+      conversations: {
+        Row: {
+          id: string
+          property_id: string | null
+          property_title: string | null
+          property_location: string | null
+          property_price: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          property_id?: string | null
+          property_title?: string | null
+          property_location?: string | null
+          property_price?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          property_id?: string | null
+          property_title?: string | null
+          property_location?: string | null
+          property_price?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      conversation_participants: {
+        Row: {
+          id: string
+          conversation_id: string
+          user_id: string
+          joined_at: string
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          user_id: string
+          joined_at?: string
+        }
+        Update: {
+          id?: string
+          conversation_id?: string
+          user_id?: string
+          joined_at?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          id: string
+          conversation_id: string
+          sender_id: string
+          content: string
+          created_at: string
+          read_at: string | null
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          sender_id: string
+          content: string
+          created_at?: string
+          read_at?: string | null
+        }
+        Update: {
+          id?: string
+          conversation_id?: string
+          sender_id?: string
+          content?: string
+          created_at?: string
+          read_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
