@@ -66,13 +66,17 @@ export async function getDjomyAuthToken(): Promise<string> {
     },
   });
 
+  const responseText = await res.text();
+  console.log(`Djomy auth response (${res.status}):`, responseText);
+
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Djomy auth failed (${res.status}): ${body}`);
+    throw new Error(`Djomy auth failed (${res.status}): ${responseText}`);
   }
 
-  const data = await res.json();
-  return data.token || data.access_token;
+  const data = JSON.parse(responseText);
+  const token = data.token || data.access_token || data.accessToken;
+  console.log(`Djomy auth token extracted: ${token ? token.substring(0, 30) + '...' : 'NULL'}`);
+  return token;
 }
 
 /**
