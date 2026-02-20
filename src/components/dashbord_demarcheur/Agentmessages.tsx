@@ -1,15 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useAuthContext } from '@/context/AuthContext';
+import {
+  getUserConversations,
+  getConversationMessages,
+  sendMessage,
+  markMessagesAsRead,
+  subscribeToMessages,
+  subscribeToConversations,
+  getUnreadCount,
+  type Conversation,
+  type Message,
+} from '@/services/messagingService';
 import styles from './AgentMessages.module.css';
 
 /* ==========================================
    ICONS COMPONENTS
 ========================================== */
-const HomeIcon = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-  </svg>
-);
-
 const MessageIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -35,27 +41,16 @@ const PhoneIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const WhatsAppIcon = ({ className }: { className?: string }) => (
+const SendIcon = ({ className }: { className?: string }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+  </svg>
+);
+
+const DoubleCheckIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-  </svg>
-);
-
-const UserIcon = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-  </svg>
-);
-
-const DotsVerticalIcon = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-  </svg>
-);
-
-const ChevronRightIcon = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+    <path d="M18.71 7.21a1 1 0 00-1.42 0l-7.45 7.46-3.13-3.14a1 1 0 00-1.42 1.42l3.84 3.84a1 1 0 001.42 0l8.16-8.16a1 1 0 000-1.42z"/>
+    <path d="M12.71 7.21a1 1 0 00-1.42 0L3.84 14.67a1 1 0 101.42 1.42l7.45-7.46 1.42 1.42a1 1 0 001.42-1.42l-1.84-1.42z"/>
   </svg>
 );
 
@@ -71,18 +66,56 @@ const EmojiIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const SendIcon = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-  </svg>
-);
+/* ==========================================
+   HELPERS
+========================================== */
+function getInitials(name: string | null): string {
+  if (!name) return '?';
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+}
 
-const DoubleCheckIcon = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M18.71 7.21a1 1 0 00-1.42 0l-7.45 7.46-3.13-3.14a1 1 0 00-1.42 1.42l3.84 3.84a1 1 0 001.42 0l8.16-8.16a1 1 0 000-1.42z"/>
-    <path d="M12.71 7.21a1 1 0 00-1.42 0L3.84 14.67a1 1 0 101.42 1.42l7.45-7.46 1.42 1.42a1 1 0 001.42-1.42l-1.84-1.42z"/>
-  </svg>
-);
+function formatTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  } else if (diffDays === 1) {
+    return 'Hier';
+  } else if (diffDays < 7) {
+    return d.toLocaleDateString('fr-FR', { weekday: 'short' });
+  }
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+}
+
+function formatDateSeparator(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return "Aujourd'hui";
+  if (diffDays === 1) return 'Hier';
+  return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+/** Group messages by date for date separators */
+function groupMessagesByDate(messages: Message[]): Array<{ type: 'date'; text: string } | { type: 'message'; msg: Message }> {
+  const items: Array<{ type: 'date'; text: string } | { type: 'message'; msg: Message }> = [];
+  let lastDate = '';
+
+  for (const msg of messages) {
+    const dateKey = new Date(msg.created_at).toDateString();
+    if (dateKey !== lastDate) {
+      items.push({ type: 'date', text: formatDateSeparator(msg.created_at) });
+      lastDate = dateKey;
+    }
+    items.push({ type: 'message', msg });
+  }
+  return items;
+}
 
 /* ==========================================
    TOP BAR COMPONENT
@@ -103,70 +136,110 @@ const TopBar = () => (
 /* ==========================================
    CONVERSATIONS PANEL COMPONENT
 ========================================== */
-const ConversationsPanel = ({ conversations, activeConversationId, onSelectConversation, tabs, activeTab, onTabChange }) => (
-  <div className={styles.conversationsPanel}>
-    <div className={styles.conversationsHeader}>
-      <div className={styles.conversationsSearch}>
-        <SearchIcon />
-        <input type="text" placeholder="Rechercher une conversation..." />
+interface ConvPanelProps {
+  conversations: Array<{
+    id: string;
+    name: string;
+    initials: string;
+    phone: string | null;
+    preview: string | null;
+    time: string;
+    unreadCount: number;
+    avatarUrl: string | null;
+  }>;
+  activeConversationId: string | null;
+  onSelectConversation: (id: string) => void;
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
+}
+
+const ConversationsPanel = ({ conversations, activeConversationId, onSelectConversation, searchQuery, onSearchChange }: ConvPanelProps) => {
+  const filtered = conversations.filter(c =>
+    c.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className={styles.conversationsPanel}>
+      <div className={styles.conversationsHeader}>
+        <div className={styles.conversationsSearch}>
+          <SearchIcon />
+          <input
+            type="text"
+            placeholder="Rechercher une conversation..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+        </div>
       </div>
-      <div className={styles.conversationsTabs}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            className={`${styles.convTab} ${activeTab === tab.id ? styles.active : ''}`}
-            onClick={() => onTabChange(tab.id)}
+
+      <div className={styles.conversationsList}>
+        {filtered.length === 0 && (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: '#94A3B8', fontSize: '0.875rem' }}>
+            Aucune conversation
+          </div>
+        )}
+        {filtered.map((conv) => (
+          <div
+            key={conv.id}
+            className={`${styles.conversationItem} ${activeConversationId === conv.id ? styles.active : ''} ${conv.unreadCount > 0 ? styles.unread : ''}`}
+            onClick={() => onSelectConversation(conv.id)}
           >
-            {tab.label}
-            <span className={styles.tabBadge}>{tab.count}</span>
-          </button>
+            <div className={styles.convAvatar}>
+              {conv.avatarUrl ? (
+                <img src={conv.avatarUrl} alt={conv.name} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+              ) : (
+                <span>{conv.initials}</span>
+              )}
+            </div>
+            <div className={styles.convContent}>
+              <div className={styles.convHeader}>
+                <span className={styles.convName}>{conv.name}</span>
+                <span className={styles.convTime}>{conv.time}</span>
+              </div>
+              <div className={styles.convPreview}>
+                {conv.unreadCount > 0 && <span className={styles.unreadDot}></span>}
+                {conv.preview || 'Nouvelle conversation'}
+              </div>
+            </div>
+          </div>
         ))}
       </div>
     </div>
-
-    <div className={styles.conversationsList}>
-      {conversations.map((conv) => (
-        <div
-          key={conv.id}
-          className={`${styles.conversationItem} ${activeConversationId === conv.id ? styles.active : ''} ${conv.unread ? styles.unread : ''}`}
-          onClick={() => onSelectConversation(conv.id)}
-        >
-          <div className={`${styles.convAvatar} ${styles[conv.type]}`}>
-            <span>{conv.initials}</span>
-            {conv.online && <span className={styles.onlineDot}></span>}
-          </div>
-          <div className={styles.convContent}>
-            <div className={styles.convHeader}>
-              <span className={styles.convName}>
-                {conv.name}
-                <span className={`${styles.convTypeBadge} ${styles[conv.type]}`}>
-                  {conv.typeLabel}
-                </span>
-              </span>
-              <span className={styles.convTime}>{conv.time}</span>
-            </div>
-            {conv.property && (
-              <div className={styles.convProperty}>
-                <HomeIcon />
-                {conv.property}
-              </div>
-            )}
-            <div className={styles.convPreview}>
-              {conv.unread && <span className={styles.unreadDot}></span>}
-              {conv.preview}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-);
+  );
+};
 
 /* ==========================================
    CHAT PANEL COMPONENT
 ========================================== */
-const ChatPanel = ({ conversation, messages, quickReplies }) => {
+interface ChatPanelProps {
+  conversation: ConvPanelProps['conversations'][0] | null;
+  messages: Message[];
+  currentUserId: string;
+  onSendMessage: (text: string) => void;
+  loading: boolean;
+}
+
+const ChatPanel = ({ conversation, messages, currentUserId, onSendMessage, loading }: ChatPanelProps) => {
   const [messageText, setMessageText] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = () => {
+    const text = messageText.trim();
+    if (!text) return;
+    onSendMessage(text);
+    setMessageText('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   if (!conversation) {
     return (
@@ -182,103 +255,80 @@ const ChatPanel = ({ conversation, messages, quickReplies }) => {
     );
   }
 
+  const grouped = groupMessagesByDate(messages);
+
   return (
     <div className={styles.chatPanel}>
       {/* Chat Header */}
       <div className={styles.chatHeader}>
         <div className={styles.chatContact}>
-          <div className={`${styles.chatAvatar} ${styles[conversation.type]}`}>
-            {conversation.initials}
+          <div className={styles.chatAvatar}>
+            {conversation.avatarUrl ? (
+              <img src={conversation.avatarUrl} alt={conversation.name} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              conversation.initials
+            )}
           </div>
           <div className={styles.chatContactInfo}>
-            <h3>
-              {conversation.name}
-              <span className={`${styles.convTypeBadge} ${styles[conversation.type]}`}>
-                {conversation.typeLabel}
-              </span>
-            </h3>
-            <p>
-              <PhoneIcon />
-              {conversation.phone} • {conversation.online ? 'En ligne' : 'Hors ligne'}
-            </p>
+            <h3>{conversation.name}</h3>
+            {conversation.phone && (
+              <p>
+                <PhoneIcon />
+                {conversation.phone}
+              </p>
+            )}
           </div>
         </div>
         <div className={styles.chatActions}>
-          <a href={`tel:${conversation.phone}`} className={`${styles.chatActionBtn} ${styles.call}`}>
-            <PhoneIcon />
-          </a>
-          <a href={`https://wa.me/${conversation.phone.replace(/\s/g, '')}`} className={`${styles.chatActionBtn} ${styles.whatsapp}`}>
-            <WhatsAppIcon />
-          </a>
-          <a href="#" className={styles.chatActionBtn}>
-            <UserIcon />
-          </a>
-          <button className={styles.chatActionBtn}>
-            <DotsVerticalIcon />
-          </button>
+          {conversation.phone && (
+            <a href={`tel:${conversation.phone}`} className={`${styles.chatActionBtn} ${styles.call}`}>
+              <PhoneIcon />
+            </a>
+          )}
         </div>
       </div>
-
-      {/* Property Context */}
-      {conversation.propertyDetails && (
-        <div className={styles.chatPropertyContext}>
-          <div className={styles.chatPropertyInfo}>
-            <div className={styles.chatPropertyIcon}>
-              <HomeIcon />
-            </div>
-            <div className={styles.chatPropertyDetails}>
-              <h4>{conversation.propertyDetails.title}</h4>
-              <p>{conversation.propertyDetails.price}</p>
-            </div>
-          </div>
-          <a href="#" className={styles.chatPropertyLink}>
-            Voir le bien
-            <ChevronRightIcon />
-          </a>
-        </div>
-      )}
 
       {/* Messages */}
       <div className={styles.chatMessages}>
-        {messages.map((item, index) => {
-          if (item.type === 'date') {
+        {loading ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>Chargement...</div>
+        ) : messages.length === 0 ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8', fontSize: '0.875rem' }}>
+            Aucun message. Envoyez le premier !
+          </div>
+        ) : (
+          grouped.map((item, index) => {
+            if (item.type === 'date') {
+              return (
+                <div key={`date-${index}`} className={styles.dateSeparator}>
+                  <div className={styles.dateSeparatorLine}></div>
+                  <span className={styles.dateSeparatorText}>{item.text}</span>
+                  <div className={styles.dateSeparatorLine}></div>
+                </div>
+              );
+            }
+
+            const msg = item.msg;
+            const direction = msg.sender_id === currentUserId ? 'sent' : 'received';
+
             return (
-              <div key={index} className={styles.dateSeparator}>
-                <div className={styles.dateSeparatorLine}></div>
-                <span className={styles.dateSeparatorText}>{item.text}</span>
-                <div className={styles.dateSeparatorLine}></div>
+              <div key={msg.id} className={`${styles.messageGroup} ${styles[direction]}`}>
+                <div className={`${styles.message} ${styles[direction]}`}>
+                  {msg.content}
+                </div>
+                <span className={styles.messageTime}>
+                  {new Date(msg.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  {direction === 'sent' && msg.read && (
+                    <span className={`${styles.messageStatus} ${styles.read}`}>
+                      <DoubleCheckIcon />
+                    </span>
+                  )}
+                </span>
               </div>
             );
-          }
-
-          return (
-            <div key={index} className={`${styles.messageGroup} ${styles[item.direction]}`}>
-              <div className={`${styles.message} ${styles[item.direction]}`}>
-                {item.text}
-              </div>
-              <span className={styles.messageTime}>
-                {item.time}
-                {item.direction === 'sent' && item.read && (
-                  <span className={`${styles.messageStatus} ${styles.read}`}>
-                    <DoubleCheckIcon />
-                  </span>
-                )}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Quick Replies */}
-      <div className={styles.quickReplies}>
-        {quickReplies.map((reply, index) => (
-          <button
-            key={index}
-            className={`${styles.quickReply} ${reply.gold ? styles.gold : ''}`}
-          >
-            {reply.text}
-          </button>
-        ))}
+          })
+        )}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Chat Input */}
@@ -290,6 +340,7 @@ const ChatPanel = ({ conversation, messages, quickReplies }) => {
               rows={1}
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
+              onKeyDown={handleKeyDown}
             />
             <div className={styles.chatInputActions}>
               <button className={styles.inputActionBtn} title="Joindre un fichier">
@@ -300,7 +351,7 @@ const ChatPanel = ({ conversation, messages, quickReplies }) => {
               </button>
             </div>
           </div>
-          <button className={styles.sendBtn}>
+          <button className={styles.sendBtn} onClick={handleSend}>
             <SendIcon />
           </button>
         </div>
@@ -313,225 +364,109 @@ const ChatPanel = ({ conversation, messages, quickReplies }) => {
    MAIN COMPONENT
 ========================================== */
 const AgentMessages = () => {
-  const [activeTab, setActiveTab] = useState('all');
-  const [activeConversationId, setActiveConversationId] = useState(1);
+  const { user } = useAuthContext();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
-  // Mock Data
-  const mockData = {
-    tabs: [
-      { id: 'all', label: 'Tous', count: 8 },
-      { id: 'prospects', label: 'Prospects', count: 5 },
-      { id: 'owners', label: 'Proprios', count: 2 },
-      { id: 'tenants', label: 'Locataires', count: 1 },
-    ],
-    conversations: [
-      {
-        id: 1,
-        name: 'Mamadou Diallo',
-        initials: 'MD',
-        type: 'prospect',
-        typeLabel: 'Prospect',
-        phone: '+224 620 12 34 56',
-        time: '14:32',
-        property: 'F3 Kipé • 2,5M GNF',
-        preview: 'Bonjour, le F3 est toujours disponible ?',
-        unread: true,
-        online: true,
-        propertyDetails: {
-          title: 'Appartement F3 Meublé • Kipé',
-          price: '2 500 000 GNF/mois',
-        },
-      },
-      {
-        id: 2,
-        name: 'Aissatou Barry',
-        initials: 'AB',
-        type: 'prospect',
-        typeLabel: 'Prospect',
-        phone: '+224 622 45 67 89',
-        time: '13:45',
-        property: 'Villa Lambanyi • 4,8M GNF',
-        preview: 'D\'accord pour jeudi 10h, à bientôt !',
-        unread: true,
-        online: false,
-        propertyDetails: {
-          title: 'Villa F4 • Lambanyi',
-          price: '4 800 000 GNF/mois',
-        },
-      },
-      {
-        id: 3,
-        name: 'Sékou Camara',
-        initials: 'SC',
-        type: 'owner',
-        typeLabel: 'Proprio',
-        phone: '+224 621 98 76 54',
-        time: '11:20',
-        property: '3 biens en gestion',
-        preview: 'Avez-vous trouvé un locataire pour la villa ?',
-        unread: false,
-        online: false,
-      },
-      {
-        id: 4,
-        name: 'Ibrahima Bah',
-        initials: 'IB',
-        type: 'prospect',
-        typeLabel: 'Prospect',
-        phone: '+224 625 11 22 33',
-        time: 'Hier',
-        property: 'Studio Nongo • 1,2M GNF',
-        preview: 'Merci pour la visite, je réfléchis encore',
-        unread: false,
-        online: false,
-        propertyDetails: {
-          title: 'Studio • Nongo',
-          price: '1 200 000 GNF/mois',
-        },
-      },
-      {
-        id: 5,
-        name: 'Fatoumata Keita',
-        initials: 'FK',
-        type: 'prospect',
-        typeLabel: 'Nouveau',
-        phone: '+224 628 44 55 66',
-        time: 'Hier',
-        preview: 'Bonjour, je cherche un appartement F2...',
-        unread: true,
-        online: false,
-      },
-      {
-        id: 6,
-        name: 'Ibrahima Sow',
-        initials: 'IS',
-        type: 'tenant',
-        typeLabel: 'Locataire',
-        phone: '+224 626 33 44 55',
-        time: 'Lun',
-        property: 'Villa F5 Kipé • 6,5M GNF',
-        preview: 'Le robinet de la cuisine fuit toujours...',
-        unread: false,
-        online: false,
-        propertyDetails: {
-          title: 'Villa F5 • Kipé',
-          price: '6 500 000 GNF/mois',
-        },
-      },
-      {
-        id: 7,
-        name: 'Oumar Diallo',
-        initials: 'OD',
-        type: 'owner',
-        typeLabel: 'Proprio',
-        phone: '+224 627 88 99 00',
-        time: 'Dim',
-        property: 'Studio Cosa • 800K GNF',
-        preview: 'Ok pour le renouvellement du mandat',
-        unread: false,
-        online: false,
-      },
-      {
-        id: 8,
-        name: 'Alpha Keita',
-        initials: 'AK',
-        type: 'prospect',
-        typeLabel: 'Prospect',
-        phone: '+224 629 11 22 33',
-        time: '28 Jan',
-        property: 'Duplex Ratoma • 3,2M GNF',
-        preview: 'Je vous recontacte le mois prochain',
-        unread: false,
-        online: false,
-        propertyDetails: {
-          title: 'Duplex • Ratoma',
-          price: '3 200 000 GNF/mois',
-        },
-      },
-    ],
-    messages: [
-      { type: 'date', text: 'Hier' },
-      {
-        direction: 'received',
-        text: 'Bonjour Monsieur l\'agent, je suis intéressé par l\'appartement F3 à Kipé que j\'ai vu sur ImmoGN.',
-        time: '16:42',
-      },
-      {
-        direction: 'sent',
-        text: 'Bonjour M. Diallo ! Merci pour votre intérêt. Oui, cet appartement est toujours disponible. Il est meublé avec 3 chambres, salon, cuisine équipée et 2 salles de bain.',
-        time: '16:45',
-        read: true,
-      },
-      {
-        direction: 'received',
-        text: 'Très bien ! C\'est combien le loyer mensuel ? Et il y a des charges en plus ?',
-        time: '16:48',
-      },
-      {
-        direction: 'sent',
-        text: 'Le loyer est de 2 500 000 GNF par mois. Les charges (eau, électricité) sont à la charge du locataire. Il y a aussi une caution de 2 mois à prévoir.',
-        time: '16:52',
-        read: true,
-      },
-      {
-        direction: 'received',
-        text: 'D\'accord, c\'est dans mon budget. Est-ce que je peux visiter l\'appartement ?',
-        time: '17:05',
-      },
-      {
-        direction: 'sent',
-        text: 'Bien sûr ! Je suis disponible demain mardi à 9h ou jeudi à 14h. Quelle date vous convient le mieux ?',
-        time: '17:10',
-        read: true,
-      },
-      {
-        direction: 'received',
-        text: 'Demain mardi 9h me convient parfaitement. Vous pouvez m\'envoyer l\'adresse exacte ?',
-        time: '17:15',
-      },
-      {
-        direction: 'sent',
-        text: 'Parfait ! L\'adresse est : Cité Chemin de Fer, Immeuble B, 3ème étage, Kipé. Je vous enverrai ma position sur WhatsApp demain matin. À demain !',
-        time: '17:20',
-        read: true,
-      },
-      { type: 'date', text: 'Aujourd\'hui' },
-      {
-        direction: 'received',
-        text: 'Bonjour, le F3 est toujours disponible ? Je voulais confirmer notre rendez-vous de ce matin.',
-        time: '14:32',
-      },
-    ],
-    quickReplies: [
-      { text: '✅ Oui, disponible' },
-      { text: '📅 Confirmer RDV', gold: true },
-      { text: '📍 Envoyer adresse' },
-      { text: '🙏 Merci, à bientôt' },
-      { text: '💰 Infos prix' },
-      { text: '📞 Je vous appelle' },
-    ],
+  const loadConversations = useCallback(async () => {
+    if (!user) return;
+    const { data } = await getUserConversations(user.id);
+    setConversations(data);
+
+    // Load unread counts
+    const counts: Record<string, number> = {};
+    for (const conv of data) {
+      counts[conv.id] = await getUnreadCount(conv.id, user.id);
+    }
+    setUnreadCounts(counts);
+  }, [user]);
+
+  // Load conversations on mount
+  useEffect(() => {
+    loadConversations();
+  }, [loadConversations]);
+
+  // Subscribe to conversation updates
+  useEffect(() => {
+    if (!user) return;
+    const unsub = subscribeToConversations(user.id, loadConversations);
+    return unsub;
+  }, [user, loadConversations]);
+
+  // Load messages when active conversation changes
+  useEffect(() => {
+    if (!activeConversationId || !user) return;
+
+    setMessagesLoading(true);
+    getConversationMessages(activeConversationId).then(({ data }) => {
+      setMessages(data);
+      setMessagesLoading(false);
+      markMessagesAsRead(activeConversationId, user.id);
+      setUnreadCounts(prev => ({ ...prev, [activeConversationId]: 0 }));
+    });
+  }, [activeConversationId, user]);
+
+  // Subscribe to new messages in active conversation
+  useEffect(() => {
+    if (!activeConversationId || !user) return;
+
+    const unsub = subscribeToMessages(activeConversationId, (newMsg) => {
+      setMessages(prev => {
+        if (prev.some(m => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+      if (newMsg.sender_id !== user.id) {
+        markMessagesAsRead(activeConversationId, user.id);
+      }
+    });
+
+    return unsub;
+  }, [activeConversationId, user]);
+
+  // Build conversation list for panel
+  const convList = conversations.map(conv => {
+    const otherParticipant = conv.participants.find(p => p.user_id !== user?.id);
+    const name = otherParticipant?.profile?.full_name || 'Utilisateur';
+    return {
+      id: conv.id,
+      name,
+      initials: getInitials(name),
+      phone: otherParticipant?.profile?.phone || null,
+      preview: conv.last_message_text,
+      time: conv.last_message_at ? formatTime(conv.last_message_at) : '',
+      unreadCount: unreadCounts[conv.id] || 0,
+      avatarUrl: otherParticipant?.profile?.avatar_url || null,
+    };
+  });
+
+  const activeConvData = convList.find(c => c.id === activeConversationId) || null;
+
+  const handleSendMessage = async (text: string) => {
+    if (!activeConversationId || !user) return;
+    await sendMessage(activeConversationId, user.id, text);
   };
-
-  const activeConversation = mockData.conversations.find(c => c.id === activeConversationId);
 
   return (
     <>
       <TopBar />
-
       <div className={styles.messagingContainer}>
         <ConversationsPanel
-          conversations={mockData.conversations}
+          conversations={convList}
           activeConversationId={activeConversationId}
           onSelectConversation={setActiveConversationId}
-          tabs={mockData.tabs}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
         />
-
         <ChatPanel
-          conversation={activeConversation}
-          messages={mockData.messages}
-          quickReplies={mockData.quickReplies}
+          conversation={activeConvData}
+          messages={messages}
+          currentUserId={user?.id || ''}
+          onSendMessage={handleSendMessage}
+          loading={messagesLoading}
         />
       </div>
     </>

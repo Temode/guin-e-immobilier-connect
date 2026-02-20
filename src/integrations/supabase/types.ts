@@ -14,9 +14,98 @@ export type Database = {
   }
   public: {
     Tables: {
+      conversation_participants: {
+        Row: {
+          conversation_id: string
+          id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          id?: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_participants_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversations: {
+        Row: {
+          created_at: string
+          id: string
+          last_message_at: string | null
+          last_message_text: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          last_message_text?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          last_message_text?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          read: boolean
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          read?: boolean
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          read?: boolean
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
+          bio: string | null
           birth_date: string | null
           created_at: string
           full_name: string | null
@@ -31,6 +120,7 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          bio?: string | null
           birth_date?: string | null
           created_at?: string
           full_name?: string | null
@@ -45,6 +135,7 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          bio?: string | null
           birth_date?: string | null
           created_at?: string
           full_name?: string | null
@@ -58,6 +149,217 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      properties: {
+        Row: {
+          address: string | null
+          amenities: Json | null
+          area: number | null
+          bathrooms: number | null
+          bedrooms: number | null
+          city: string
+          commune: string | null
+          country: string | null
+          created_at: string | null
+          currency: string
+          description: string | null
+          furnished: boolean | null
+          id: string
+          images: Json | null
+          is_premium: boolean | null
+          latitude: number | null
+          longitude: number | null
+          owner_id: string
+          price: number
+          published_at: string | null
+          quartier: string | null
+          status: string
+          title: string
+          transaction_type: string
+          type: string
+          updated_at: string | null
+          verified: boolean | null
+        }
+        Insert: {
+          address?: string | null
+          amenities?: Json | null
+          area?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          city: string
+          commune?: string | null
+          country?: string | null
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          furnished?: boolean | null
+          id?: string
+          images?: Json | null
+          is_premium?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          owner_id: string
+          price: number
+          published_at?: string | null
+          quartier?: string | null
+          status?: string
+          title: string
+          transaction_type: string
+          type: string
+          updated_at?: string | null
+          verified?: boolean | null
+        }
+        Update: {
+          address?: string | null
+          amenities?: Json | null
+          area?: number | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          city?: string
+          commune?: string | null
+          country?: string | null
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          furnished?: boolean | null
+          id?: string
+          images?: Json | null
+          is_premium?: boolean | null
+          latitude?: number | null
+          longitude?: number | null
+          owner_id?: string
+          price?: number
+          published_at?: string | null
+          quartier?: string | null
+          status?: string
+          title?: string
+          transaction_type?: string
+          type?: string
+          updated_at?: string | null
+          verified?: boolean | null
+        }
+        Relationships: []
+      }
+      rentals: {
+        Row: {
+          agent_commission_percent: number | null
+          agent_id: string | null
+          created_at: string | null
+          currency: string
+          end_date: string | null
+          id: string
+          owner_id: string
+          payment_day_of_month: number | null
+          payment_method: string | null
+          property_id: string
+          rent_amount: number
+          start_date: string
+          status: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          agent_commission_percent?: number | null
+          agent_id?: string | null
+          created_at?: string | null
+          currency?: string
+          end_date?: string | null
+          id?: string
+          owner_id: string
+          payment_day_of_month?: number | null
+          payment_method?: string | null
+          property_id: string
+          rent_amount: number
+          start_date: string
+          status?: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          agent_commission_percent?: number | null
+          agent_id?: string | null
+          created_at?: string | null
+          currency?: string
+          end_date?: string | null
+          id?: string
+          owner_id?: string
+          payment_day_of_month?: number | null
+          payment_method?: string | null
+          property_id?: string
+          rent_amount?: number
+          start_date?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rentals_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          description: string | null
+          id: string
+          metadata: Json | null
+          payer_id: string
+          payment_method: string
+          payment_reference: string | null
+          receiver_id: string
+          rental_id: string | null
+          status: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          payer_id: string
+          payment_method?: string
+          payment_reference?: string | null
+          receiver_id: string
+          rental_id?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          metadata?: Json | null
+          payer_id?: string
+          payment_method?: string
+          payment_reference?: string | null
+          receiver_id?: string
+          rental_id?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_rental_id_fkey"
+            columns: ["rental_id"]
+            isOneToOne: false
+            referencedRelation: "rentals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -77,16 +379,48 @@ export type Database = {
         }
         Relationships: []
       }
+      wallets: {
+        Row: {
+          balance: number
+          created_at: string
+          currency: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      get_user_id_by_email: { Args: { email_input: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_conversation_member: {
+        Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
       }
     }

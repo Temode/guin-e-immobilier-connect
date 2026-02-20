@@ -1,4 +1,8 @@
 // @ts-nocheck
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuthContext } from '@/context/AuthContext';
+import { getTenantActiveRental, daysUntilNextPayment, formatPaymentMethod, monthsRemaining, type RentalWithDetails } from '@/services/rentalService';
 import styles from './Dashboard_Locataire.module.css';
 
 /* ==========================================
@@ -50,12 +54,6 @@ const SettingsIcon = ({ className }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
     <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
-);
-
-const DotsVerticalIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
   </svg>
 );
 
@@ -246,10 +244,10 @@ const RentCard = ({ rent, paymentMethod, onEditPaymentMethod }) => {
 ========================================== */
 const QuickActions = ({ actions }) => {
   const defaultActions = [
-    { id: 'contact', icon: MessageIcon, iconStyle: 'iconContact', title: "Contacter l'agent", description: 'Envoyer un message à Abdoulaye', href: '#' },
+    { id: 'contact', icon: MessageIcon, iconStyle: 'iconContact', title: "Contacter l'agent", description: 'Envoyer un message', href: '#' },
     { id: 'problem', icon: WarningIcon, iconStyle: 'iconProblem', title: 'Signaler un problème', description: 'Fuite, panne, dégât...', href: '#' },
-    { id: 'receipt', icon: DocumentIcon, iconStyle: 'iconReceipt', title: 'Télécharger un reçu', description: 'Janvier 2026', href: '#' },
-    { id: 'contract', icon: DocumentIcon, iconStyle: 'iconContract', title: 'Voir mon contrat', description: 'Bail signé le 1er Juin 2025', href: '#' },
+    { id: 'receipt', icon: DocumentIcon, iconStyle: 'iconReceipt', title: 'Télécharger un reçu', description: 'Dernier paiement', href: '#' },
+    { id: 'contract', icon: DocumentIcon, iconStyle: 'iconContract', title: 'Voir mon contrat', description: 'Bail en cours', href: '#' },
   ];
 
   const items = actions || defaultActions;
@@ -299,39 +297,6 @@ const Card = ({ title, icon: Icon, actionLabel, actionHref, children, noPaddingT
 };
 
 /* ==========================================
-   PAYMENT HISTORY COMPONENT
-========================================== */
-const PaymentHistory = ({ payments }) => {
-  const formatAmount = (amount, currency) => {
-    return `${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} ${currency}`;
-  };
-
-  return (
-    <Card title="Historique des paiements" icon={PaymentIcon} actionLabel="Voir tout" actionHref="#">
-      <div className={styles.paymentList}>
-        {payments.map((payment, index) => (
-          <div key={index} className={styles.paymentItem}>
-            <div className={`${styles.paymentItemIcon} ${payment.status === 'paid' ? styles.paid : styles.failed}`}>
-              <CheckIcon />
-            </div>
-            <div className={styles.paymentItemDetails}>
-              <p className={styles.paymentItemTitle}>{payment.title}</p>
-              <p className={styles.paymentItemDate}>{payment.date} • {payment.method}</p>
-            </div>
-            <span className={styles.paymentItemAmount}>
-              {formatAmount(payment.amount, payment.currency)}
-            </span>
-            <button className={styles.paymentItemReceipt} aria-label="Télécharger reçu">
-              <DownloadIcon />
-            </button>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-};
-
-/* ==========================================
    AGENT CARD COMPONENT
 ========================================== */
 const AgentCard = ({ agent, onMessage, onCall }) => {
@@ -357,9 +322,11 @@ const AgentCard = ({ agent, onMessage, onCall }) => {
           <button className={`${styles.agentBtn} ${styles.primary}`} aria-label="Envoyer un message" onClick={onMessage}>
             <MessageIcon />
           </button>
-          <button className={`${styles.agentBtn} ${styles.secondary}`} aria-label="Appeler" onClick={onCall}>
-            <PhoneIcon />
-          </button>
+          {agent.phone && (
+            <button className={`${styles.agentBtn} ${styles.secondary}`} aria-label="Appeler" onClick={onCall}>
+              <PhoneIcon />
+            </button>
+          )}
         </div>
       </div>
     </Card>
@@ -426,87 +393,161 @@ const Notifications = ({ notifications }) => {
 };
 
 /* ==========================================
+   NO RENTAL STATE COMPONENT
+========================================== */
+const NoRentalState = () => {
+  const navigate = useNavigate();
+  return (
+    <div className={styles.mainContent}>
+      <div className={styles.noRentalState}>
+        <BuildingIcon />
+        <h2>Aucune location active</h2>
+        <p>Vous n'avez pas encore de logement loué. Commencez par rechercher un bien qui vous correspond.</p>
+        <button className={styles.searchBtn} onClick={() => navigate('/dashboard-locataire/recherche')}>
+          <SearchIcon /> Rechercher un logement
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ==========================================
    MAIN DASHBOARD COMPONENT
 ========================================== */
 const Dashboard_Locataire = () => {
-  // Données de démonstration
-  const mockData = {
-    user: {
-      name: 'Mamadou Bah',
-      role: 'Locataire',
-      verified: true,
-    },
-    property: {
-      type: 'Appartement T3',
-      surface: '85m²',
-      address: 'Cité Chemins de Fer, Kaloum',
-      status: 'Bail actif • Expire dans 8 mois',
-    },
-    rent: {
-      label: 'Loyer du mois de Janvier 2026',
-      amount: 2000000,
-      currency: 'GNF',
-      status: 'paid',
-      statusText: 'Payé le 1er Jan.',
-      daysUntilNext: 12,
-      dueDate: '1er Février 2026',
-      paymentMode: 'Prélèvement automatique',
-    },
-    paymentMethod: {
-      iconText: 'OM',
-      label: 'Orange Money • 620 ** ** 45',
-      isActive: true,
-    },
-    payments: [
-      { title: 'Loyer Janvier 2026', date: '1 Janvier 2026', method: 'Orange Money', amount: 2000000, currency: 'GNF', status: 'paid' },
-      { title: 'Loyer Décembre 2025', date: '1 Décembre 2025', method: 'Orange Money', amount: 2000000, currency: 'GNF', status: 'paid' },
-      { title: 'Loyer Novembre 2025', date: '1 Novembre 2025', method: 'Orange Money', amount: 2000000, currency: 'GNF', status: 'paid' },
-      { title: 'Loyer Octobre 2025', date: '1 Octobre 2025', method: 'Orange Money', amount: 2000000, currency: 'GNF', status: 'paid' },
-    ],
-    agent: {
-      name: 'Abdoulaye Diallo',
-      role: 'Agent immobilier',
-      verified: true,
-    },
-    housing: {
-      type: 'Appartement T3',
-      surface: '85 m²',
-      startDate: '1 Juin 2025',
-      endDate: '31 Mai 2026',
-    },
-    notifications: [
-      { type: 'success', title: 'Paiement réussi', message: 'Votre loyer de Janvier a été prélevé avec succès.', time: 'Il y a 20 jours', unread: true },
-      { type: 'info', title: 'Message', message: 'Abdoulaye vous a envoyé un message.', time: 'Il y a 3 jours', unread: false },
-      { type: 'warning', title: 'Rappel', message: 'Votre bail expire dans 8 mois.', time: 'Il y a 1 semaine', unread: false },
-    ],
+  const { user, profile } = useAuthContext();
+  const navigate = useNavigate();
+  const [rental, setRental] = useState<RentalWithDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      setLoading(true);
+      const { data } = await getTenantActiveRental(user.id);
+      setRental(data);
+      setLoading(false);
+    })();
+  }, [user]);
+
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
+  const firstName = profile?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Utilisateur';
+
+  if (loading) {
+    return (
+      <>
+        <Header title="Tableau de bord" date={dateStr} hasNotifications={false} />
+        <div className={styles.mainContent}>
+          <div className={styles.loadingState}>Chargement...</div>
+        </div>
+      </>
+    );
+  }
+
+  // No active rental → show empty state
+  if (!rental) {
+    return (
+      <>
+        <Header title="Tableau de bord" date={dateStr} hasNotifications={false} />
+        <NoRentalState />
+      </>
+    );
+  }
+
+  // Build data from rental
+  const property = rental.property;
+  const agentOrOwner = rental.agent_profile || rental.owner_profile;
+  const agentName = agentOrOwner?.full_name || 'Propriétaire';
+  const agentPhone = agentOrOwner?.phone || null;
+  const agentVerified = agentOrOwner?.kyc_status === 'verified';
+
+  const remainingMonths = monthsRemaining(rental.end_date);
+  const propertyData = {
+    type: property ? `${property.type} ${property.bedrooms ? `T${property.bedrooms}` : ''}`.trim() : 'Logement',
+    surface: property?.area ? `${property.area}m²` : '—',
+    address: property ? [property.quartier, property.commune, property.city].filter(Boolean).join(', ') : '—',
+    status: rental.end_date
+      ? `Bail actif • Expire dans ${remainingMonths ?? '?'} mois`
+      : 'Bail actif • Durée indéterminée',
   };
 
+  const paymentDay = rental.payment_day_of_month;
+  const daysLeft = daysUntilNextPayment(paymentDay);
+  const nextDate = new Date();
+  if (nextDate.getDate() >= paymentDay) {
+    nextDate.setMonth(nextDate.getMonth() + 1);
+  }
+  nextDate.setDate(paymentDay);
+  const nextDateStr = nextDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  const paymentMethodInfo = formatPaymentMethod(rental.payment_method);
+
+  const rentData = {
+    label: `Loyer du mois`,
+    amount: rental.rent_amount,
+    currency: rental.currency,
+    status: 'pending',
+    statusText: 'En attente',
+    daysUntilNext: daysLeft,
+    dueDate: nextDateStr,
+    paymentMode: paymentMethodInfo.label,
+  };
+
+  const paymentMethodData = {
+    iconText: paymentMethodInfo.iconText,
+    label: paymentMethodInfo.label,
+    isActive: !!rental.payment_method,
+  };
+
+  const housingData = {
+    type: propertyData.type,
+    surface: propertyData.surface,
+    startDate: new Date(rental.start_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }),
+    endDate: rental.end_date
+      ? new Date(rental.end_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+      : 'Indéterminée',
+  };
+
+  const agentData = {
+    name: agentName,
+    role: rental.agent_id ? 'Agent immobilier' : 'Propriétaire',
+    verified: agentVerified,
+    phone: agentPhone,
+  };
+
+  const notifications = [
+    { type: 'info', title: 'Location active', message: `Votre bail a commencé le ${housingData.startDate}.`, time: 'Récent', unread: true },
+    ...(remainingMonths !== null && remainingMonths <= 3
+      ? [{ type: 'warning', title: 'Rappel', message: `Votre bail expire dans ${remainingMonths} mois.`, time: 'Récent', unread: false }]
+      : []),
+  ];
+
   const handleEditPaymentMethod = () => console.log('Edit payment method');
-  const handleMessageAgent = () => console.log('Message agent');
-  const handleCallAgent = () => console.log('Call agent');
+  const handleMessageAgent = () => navigate('/dashboard-locataire/messages');
+  const handleCallAgent = () => { if (agentPhone) window.open(`tel:${agentPhone}`); };
 
   return (
     <>
-      <Header title="Tableau de bord" date="Dim. 1 Février 2026" hasNotifications />
+      <Header title="Tableau de bord" date={dateStr} hasNotifications={notifications.length > 0} />
 
       <main className={styles.mainContent}>
-        <WelcomeBanner userName="Mamadou" property={mockData.property} />
+        <WelcomeBanner userName={firstName} property={propertyData} />
 
         <div className={styles.dashboardGrid}>
           <div className={styles.dashboardMain}>
             <RentCard
-              rent={mockData.rent}
-              paymentMethod={mockData.paymentMethod}
+              rent={rentData}
+              paymentMethod={paymentMethodData}
               onEditPaymentMethod={handleEditPaymentMethod}
             />
             <QuickActions />
-            <PaymentHistory payments={mockData.payments} />
           </div>
 
           <div className={styles.dashboardSide}>
-            <AgentCard agent={mockData.agent} onMessage={handleMessageAgent} onCall={handleCallAgent} />
-            <HousingDetails housing={mockData.housing} />
-            <Notifications notifications={mockData.notifications} />
+            <AgentCard agent={agentData} onMessage={handleMessageAgent} onCall={handleCallAgent} />
+            <HousingDetails housing={housingData} />
+            <Notifications notifications={notifications} />
           </div>
         </div>
       </main>
