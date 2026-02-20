@@ -119,45 +119,16 @@ export async function markMessagesAsRead(conversationId: string, userId: string)
     .eq('read', false);
 }
 
-/** Create or get existing conversation between two users */
+/** Create or get existing conversation between two users (atomic via DB function) */
 export async function getOrCreateConversation(userId1: string, userId2: string): Promise<{ data: string | null; error: Error | null }> {
   try {
-    // Check if a conversation already exists between these two users
-    const { data: p1 } = await supabase
-      .from('conversation_participants')
-      .select('conversation_id')
-      .eq('user_id', userId1);
+    const { data, error } = await supabase.rpc('get_or_create_conversation', {
+      user_id_1: userId1,
+      user_id_2: userId2,
+    });
 
-    const { data: p2 } = await supabase
-      .from('conversation_participants')
-      .select('conversation_id')
-      .eq('user_id', userId2);
-
-    const ids1 = new Set((p1 || []).map(p => p.conversation_id));
-    const commonId = (p2 || []).find(p => ids1.has(p.conversation_id))?.conversation_id;
-
-    if (commonId) return { data: commonId, error: null };
-
-    // Create new conversation
-    const { data: conv, error: cErr } = await supabase
-      .from('conversations')
-      .insert({})
-      .select()
-      .single();
-
-    if (cErr || !conv) throw cErr;
-
-    // Add both participants
-    const { error: pErr } = await supabase
-      .from('conversation_participants')
-      .insert([
-        { conversation_id: conv.id, user_id: userId1 },
-        { conversation_id: conv.id, user_id: userId2 },
-      ]);
-
-    if (pErr) throw pErr;
-
-    return { data: conv.id, error: null };
+    if (error) throw error;
+    return { data: data as string, error: null };
   } catch (err) {
     return { data: null, error: err as Error };
   }
