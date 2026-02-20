@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { useState } from 'react';
-=======
 import { useState, useEffect } from 'react';
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthContext } from '@/context/AuthContext';
 import styles from './AddTenantModal.module.css';
@@ -13,8 +9,6 @@ interface AddTenantModalProps {
   preselectedPropertyId?: string;
 }
 
-<<<<<<< HEAD
-=======
 interface AvailableProperty {
   id: string;
   title: string;
@@ -26,7 +20,6 @@ interface AvailableProperty {
   price: number;
 }
 
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
 const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenantModalProps) => {
   const { user } = useAuthContext();
   const [email, setEmail] = useState('');
@@ -41,8 +34,6 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
   const [step, setStep] = useState<'form' | 'confirm'>('form');
   const [tenantProfile, setTenantProfile] = useState<any>(null);
   const [propertyData, setPropertyData] = useState<any>(null);
-<<<<<<< HEAD
-=======
   const [availableProperties, setAvailableProperties] = useState<AvailableProperty[]>([]);
   const [loadingProperties, setLoadingProperties] = useState(true);
 
@@ -58,7 +49,6 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
         .order('created_at', { ascending: false });
       setAvailableProperties((data || []) as AvailableProperty[]);
       setLoadingProperties(false);
-      // If a property is preselected, auto-fill rent from its price
       if (preselectedPropertyId && data) {
         const preselected = data.find(p => p.id === preselectedPropertyId);
         if (preselected) setRentAmount(String(preselected.price));
@@ -66,7 +56,6 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
     };
     fetchAvailableProperties();
   }, [user]);
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
 
   const validateAndFetch = async () => {
     setError('');
@@ -77,21 +66,6 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
 
     setLoading(true);
     try {
-      // 1. Find user by email via auth - look in profiles that match
-      const { data: profiles, error: profileErr } = await supabase
-        .from('profiles')
-        .select('id, full_name, phone, kyc_status')
-        .limit(100);
-
-      if (profileErr) throw profileErr;
-
-      // We need to find the user by email. Since we can't query auth.users directly,
-      // we'll search by fetching user_roles for users who exist and try to match.
-      // Best approach: use a service-role edge function. For now, search by trying signIn approach.
-      // Alternative: store email in profiles. Let's try to get user by looking at a custom RPC or
-      // using the admin API via edge function. For simplicity, let's use a lookup approach:
-      
-      // Actual approach: use a postgres function to find user by email
       const { data: userByEmail, error: userEmailErr } = await supabase
         .rpc('get_user_id_by_email' as any, { email_input: email.toLowerCase().trim() });
 
@@ -103,21 +77,15 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
 
       const tenantId = userByEmail;
 
-      // 2. Fetch tenant profile
       const { data: profile } = await supabase
         .from('profiles')
         .select('id, full_name, phone, kyc_status')
         .eq('id', tenantId)
         .single();
 
-      // 3. Validate property exists and belongs to agent
       const { data: property, error: propErr } = await supabase
         .from('properties')
-<<<<<<< HEAD
-        .select('id, title, city, commune, quartier, type, bedrooms, area, images')
-=======
         .select('id, title, city, commune, quartier, type, bedrooms, area, images, owner_id')
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
         .eq('id', propertyId)
         .single();
 
@@ -160,7 +128,6 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
 
       if (rentalErr) throw rentalErr;
 
-      // Update property status to 'rented'
       await supabase
         .from('properties')
         .update({ status: 'rented' })
@@ -221,17 +188,6 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
               </div>
 
               <div className={styles.formGroup + ' ' + styles.fullWidth}>
-<<<<<<< HEAD
-                <label>ID du bien *</label>
-                <input
-                  type="text"
-                  placeholder="UUID du bien (ex: abc123...)"
-                  value={propertyId}
-                  onChange={(e) => setPropertyId(e.target.value)}
-                  className={styles.input}
-                />
-                <span className={styles.hint}>Copiez l'ID depuis la liste de vos biens</span>
-=======
                 <label>Bien à louer *</label>
                 <select
                   value={propertyId}
@@ -257,7 +213,6 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
                 {availableProperties.length === 0 && !loadingProperties && (
                   <span className={styles.hint}>Aucun bien avec le statut "disponible" trouvé. Vérifiez le statut de vos biens.</span>
                 )}
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
               </div>
 
               <div className={styles.formGroup}>
@@ -269,12 +224,9 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
                   onChange={(e) => setRentAmount(e.target.value)}
                   className={styles.input}
                 />
-<<<<<<< HEAD
-=======
                 {propertyId && rentAmount && (
                   <span className={styles.hint}>💡 Pré-rempli depuis le prix du bien — modifiable</span>
                 )}
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
               </div>
 
               <div className={styles.formGroup}>

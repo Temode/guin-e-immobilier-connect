@@ -184,18 +184,7 @@ export function subscribeToMessages(conversationId: string, onMessage: (msg: Mes
   };
 }
 
-<<<<<<< HEAD
-/** Subscribe to conversation updates (last_message changes) */
-export function subscribeToConversations(userId: string, onUpdate: () => void) {
-  const channel = supabase
-    .channel(`conversations:${userId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'conversations',
-=======
+
 /** Subscribe to conversation updates (last_message changes + new conversations) */
 export function subscribeToConversations(userId: string, onUpdate: () => void) {
   const channel = supabase
@@ -214,7 +203,6 @@ export function subscribeToConversations(userId: string, onUpdate: () => void) {
         schema: 'public',
         table: 'conversation_participants',
         filter: `user_id=eq.${userId}`,
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
       },
       () => onUpdate()
     )
