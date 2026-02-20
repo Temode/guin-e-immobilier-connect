@@ -102,6 +102,39 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          metadata: Json | null
+          read: boolean
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          metadata?: Json | null
+          read?: boolean
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          metadata?: Json | null
+          read?: boolean
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -406,11 +439,49 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_events: {
+        Row: {
+          created_at: string
+          djomy_transaction_id: string | null
+          event_type: string
+          id: string
+          payload: Json | null
+          processed: boolean
+          source: string
+        }
+        Insert: {
+          created_at?: string
+          djomy_transaction_id?: string | null
+          event_type: string
+          id?: string
+          payload?: Json | null
+          processed?: boolean
+          source?: string
+        }
+        Update: {
+          created_at?: string
+          djomy_transaction_id?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json | null
+          processed?: boolean
+          source?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      complete_sandbox_payment: {
+        Args: { p_is_success: boolean; p_transaction_id: string }
+        Returns: Json
+      }
+      credit_wallet_atomic: {
+        Args: { p_amount: number; p_currency?: string; p_user_id: string }
+        Returns: undefined
+      }
       get_or_create_conversation: {
         Args: { user_id_1: string; user_id_2: string }
         Returns: string
@@ -426,6 +497,23 @@ export type Database = {
       is_conversation_member: {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
+      }
+      process_rent_payment: {
+        Args: {
+          p_payment_method?: string
+          p_phone_number?: string
+          p_rental_id: string
+        }
+        Returns: Json
+      }
+      withdraw_funds: {
+        Args: {
+          p_amount: number
+          p_bank_account?: string
+          p_method: string
+          p_phone_number?: string
+        }
+        Returns: Json
       }
     }
     Enums: {

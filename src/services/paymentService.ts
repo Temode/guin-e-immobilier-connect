@@ -124,7 +124,8 @@ export async function simulateRentPayment(params: {
 
   // Use SECURITY DEFINER RPC to atomically update status + credit receiver wallet
   // (bypasses RLS which would prevent updating another user's wallet)
-  const { data: rpcResult, error: rpcErr } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rpcResult, error: rpcErr } = await (supabase as any)
     .rpc('complete_sandbox_payment', {
       p_transaction_id: transaction.id,
       p_is_success: Math.random() > 0.1,
@@ -217,7 +218,8 @@ export async function processRentPayment(params: {
   error: Error | null;
 }> {
   // Try the SECURITY DEFINER RPC first (requires migration 20260220120000 to be applied)
-  const { data: rpcResult, error: rpcError } = await supabase.rpc('process_rent_payment', {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rpcResult, error: rpcError } = await (supabase as any).rpc('process_rent_payment', {
     p_rental_id: params.rentalId,
     p_payment_method: params.paymentMethod || 'orange_money',
     p_phone_number: params.phoneNumber || null,
@@ -310,7 +312,8 @@ export async function withdrawFunds(params: {
   // Simulate delay
   await new Promise(resolve => setTimeout(resolve, 2000));
 
-  const { data: rpcResult, error } = await supabase.rpc('withdraw_funds', {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rpcResult, error } = await (supabase as any).rpc('withdraw_funds', {
     p_amount: params.amount,
     p_method: params.method,
     p_phone_number: params.phoneNumber || null,
