@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { useState } from 'react';
+=======
+import { useState, useEffect } from 'react';
+>>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthContext } from '@/context/AuthContext';
 import styles from './AddTenantModal.module.css';
@@ -9,6 +13,20 @@ interface AddTenantModalProps {
   preselectedPropertyId?: string;
 }
 
+<<<<<<< HEAD
+=======
+interface AvailableProperty {
+  id: string;
+  title: string;
+  city: string;
+  commune: string | null;
+  quartier: string | null;
+  type: string;
+  images: any;
+  price: number;
+}
+
+>>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
 const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenantModalProps) => {
   const { user } = useAuthContext();
   const [email, setEmail] = useState('');
@@ -23,6 +41,32 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
   const [step, setStep] = useState<'form' | 'confirm'>('form');
   const [tenantProfile, setTenantProfile] = useState<any>(null);
   const [propertyData, setPropertyData] = useState<any>(null);
+<<<<<<< HEAD
+=======
+  const [availableProperties, setAvailableProperties] = useState<AvailableProperty[]>([]);
+  const [loadingProperties, setLoadingProperties] = useState(true);
+
+  useEffect(() => {
+    const fetchAvailableProperties = async () => {
+      if (!user) return;
+      setLoadingProperties(true);
+      const { data } = await supabase
+        .from('properties')
+        .select('id, title, city, commune, quartier, type, images, price')
+        .eq('owner_id', user.id)
+        .in('status', ['available', 'published'])
+        .order('created_at', { ascending: false });
+      setAvailableProperties((data || []) as AvailableProperty[]);
+      setLoadingProperties(false);
+      // If a property is preselected, auto-fill rent from its price
+      if (preselectedPropertyId && data) {
+        const preselected = data.find(p => p.id === preselectedPropertyId);
+        if (preselected) setRentAmount(String(preselected.price));
+      }
+    };
+    fetchAvailableProperties();
+  }, [user]);
+>>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
 
   const validateAndFetch = async () => {
     setError('');
@@ -69,7 +113,11 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
       // 3. Validate property exists and belongs to agent
       const { data: property, error: propErr } = await supabase
         .from('properties')
+<<<<<<< HEAD
         .select('id, title, city, commune, quartier, type, bedrooms, area, images')
+=======
+        .select('id, title, city, commune, quartier, type, bedrooms, area, images, owner_id')
+>>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
         .eq('id', propertyId)
         .single();
 
@@ -173,6 +221,7 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
               </div>
 
               <div className={styles.formGroup + ' ' + styles.fullWidth}>
+<<<<<<< HEAD
                 <label>ID du bien *</label>
                 <input
                   type="text"
@@ -182,6 +231,33 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
                   className={styles.input}
                 />
                 <span className={styles.hint}>Copiez l'ID depuis la liste de vos biens</span>
+=======
+                <label>Bien à louer *</label>
+                <select
+                  value={propertyId}
+                  onChange={(e) => {
+                    const selectedId = e.target.value;
+                    setPropertyId(selectedId);
+                    const selected = availableProperties.find(p => p.id === selectedId);
+                    if (selected) setRentAmount(String(selected.price));
+                    else setRentAmount('');
+                  }}
+                  className={styles.input}
+                  disabled={loadingProperties}
+                >
+                  <option value="">
+                    {loadingProperties ? 'Chargement des biens...' : availableProperties.length === 0 ? 'Aucun bien disponible' : '— Sélectionnez un bien —'}
+                  </option>
+                  {availableProperties.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title} — {[p.quartier, p.commune, p.city].filter(Boolean).join(', ')}
+                    </option>
+                  ))}
+                </select>
+                {availableProperties.length === 0 && !loadingProperties && (
+                  <span className={styles.hint}>Aucun bien avec le statut "disponible" trouvé. Vérifiez le statut de vos biens.</span>
+                )}
+>>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
               </div>
 
               <div className={styles.formGroup}>
@@ -193,6 +269,12 @@ const AddTenantModal = ({ onClose, onSuccess, preselectedPropertyId }: AddTenant
                   onChange={(e) => setRentAmount(e.target.value)}
                   className={styles.input}
                 />
+<<<<<<< HEAD
+=======
+                {propertyId && rentAmount && (
+                  <span className={styles.hint}>💡 Pré-rempli depuis le prix du bien — modifiable</span>
+                )}
+>>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
               </div>
 
               <div className={styles.formGroup}>

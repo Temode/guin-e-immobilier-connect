@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
@@ -31,44 +31,68 @@ export function useAuth() {
   const navigate = useNavigate();
 
   const fetchProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('full_name, phone, avatar_url, kyc_status, subscription_plan')
-      .eq('id', userId)
-      .single();
-    return data;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, phone, avatar_url, kyc_status, subscription_plan')
+        .eq('id', userId)
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      console.error('fetchProfile error', err);
+      return null;
+    }
   }, []);
-
   useEffect(() => {
-    // Set up auth listener BEFORE getSession
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        const user = session?.user ?? null;
-        let profile = null;
+    const isMounted = { current: true };
+    const initializingRef = { current: true } as { current: boolean };
+    let lastFetchId = 0;
 
-        if (user) {
-          // Use setTimeout to avoid potential deadlocks with Supabase client
-          setTimeout(async () => {
-            profile = await fetchProfile(user.id);
-            setState({ user, session, loading: false, profile });
-          }, 0);
-        } else {
-          setState({ user: null, session: null, loading: false, profile: null });
+    const handleSession = async (session: Session | null) => {
+      const user = session?.user ?? null;
+      if (!user) {
+        if (!isMounted.current) return;
+        setState({ user: null, session: null, loading: false, profile: null });
+        return;
+      }
+
+      const myFetchId = ++lastFetchId;
+      const profile = await fetchProfile(user.id);
+      if (!isMounted.current) return;
+      if (myFetchId !== lastFetchId) return; // stale
+      setState({ user, session, loading: false, profile });
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        // Ignore token refresh noisy events and ignore while we are initializing
+        if (event === 'TOKEN_REFRESHED' || initializingRef.current) return;
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+          void handleSession(session);
         }
       }
     );
 
-    // Then check existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const user = session?.user ?? null;
-      let profile = null;
-      if (user) {
-        profile = await fetchProfile(user.id);
-      }
-      setState({ user, session, loading: false, profile });
-    });
+    // Initialize from current session first
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        void handleSession(session);
+      })
+      .catch((err) => {
+        console.error('getSession error', err);
+        if (isMounted.current) {
+          setState({ user: null, session: null, loading: false, profile: null });
+        }
+      })
+      .finally(() => {
+        initializingRef.current = false;
+      });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted.current = false;
+      try { subscription.unsubscribe(); } catch (e) { /* ignore */ }
+    };
   }, [fetchProfile]);
 
   const signUpWithEmail = async (
@@ -80,14 +104,16 @@ export function useAuth() {
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: `${window.location.origin}/user-role`,
         data: {
           full_name: metadata.full_name,
           phone: metadata.phone,
         },
       },
     });
-    if (data.session) {
+    if (data.session && data.user) {
+      const profile = await fetchProfile(data.user.id);
+      setState({ user: data.user, session: data.session, loading: false, profile });
       navigate('/user-role');
     }
     return { data, error };

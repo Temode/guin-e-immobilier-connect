@@ -1,5 +1,9 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef } from 'react';
+<<<<<<< HEAD
+=======
+import { useLocation } from 'react-router-dom';
+>>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
 import styles from './Messages.module.css';
 import { useAuthContext } from '@/context/AuthContext';
 import {
@@ -9,6 +13,10 @@ import {
   markMessagesAsRead,
   subscribeToMessages,
   subscribeToConversations,
+<<<<<<< HEAD
+=======
+  getOrCreateConversation,
+>>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
   type Conversation,
   type Message,
 } from '@/services/messagingService';
@@ -350,6 +358,10 @@ const ChatPanel = ({ conversation, messages, currentUserId, onSendMessage, loadi
 ========================================== */
 const Messages = () => {
   const { user } = useAuthContext();
+<<<<<<< HEAD
+=======
+  const location = useLocation();
+>>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -357,6 +369,10 @@ const Messages = () => {
   const [activeFilter, setActiveFilter] = useState('Tous');
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
+<<<<<<< HEAD
+=======
+  const pendingContactRef = useRef(false);
+>>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
 
   const today = new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -366,6 +382,7 @@ const Messages = () => {
     const { data } = await getUserConversations(user.id);
     setConversations(data || []);
     setLoadingConvs(false);
+<<<<<<< HEAD
     if (data && data.length > 0 && !activeConversationId) {
       setActiveConversationId(data[0].id);
     }
@@ -377,15 +394,56 @@ const Messages = () => {
 
     const unsub = subscribeToConversations(user.id, loadConversations);
     return () => { supabase?.removeChannel?.(unsub); };
+=======
+    return data || [];
+  };
+
+  // Handle navigation from PropertyDetail — auto-create/open conversation with agent
+  useEffect(() => {
+    if (!user || pendingContactRef.current) return;
+    const state = location.state as { agentId?: string } | null;
+    if (!state?.agentId) return;
+
+    pendingContactRef.current = true;
+    (async () => {
+      const { data: convId } = await getOrCreateConversation(user.id, state.agentId);
+      const convs = await loadConversations();
+      if (convId) {
+        setActiveConversationId(convId);
+      } else if (convs.length > 0) {
+        setActiveConversationId(convs[0].id);
+      }
+      // Clear navigation state so it doesn't re-trigger
+      window.history.replaceState({}, '');
+    })();
+  }, [user, location.state]);
+
+  // Load conversations on mount
+  useEffect(() => {
+    if (!user) return;
+    loadConversations().then((data) => {
+      if (data && data.length > 0 && !activeConversationId) {
+        setActiveConversationId(data[0].id);
+      }
+    });
+
+    const unsub = subscribeToConversations(user.id, () => loadConversations());
+    return unsub;
+>>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
   }, [user]);
 
   // Load messages when active conversation changes
   useEffect(() => {
+<<<<<<< HEAD
     if (!activeConversationId) return;
+=======
+    if (!activeConversationId || !user) return;
+>>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
     setLoadingMsgs(true);
     getConversationMessages(activeConversationId).then(({ data }) => {
       setMessages(data || []);
       setLoadingMsgs(false);
+<<<<<<< HEAD
       if (user) markMessagesAsRead(activeConversationId, user.id);
     });
 
@@ -405,6 +463,29 @@ const Messages = () => {
       // Refresh conversations to update last message
       loadConversations();
     }
+=======
+      markMessagesAsRead(activeConversationId, user.id);
+    });
+
+    const unsub = subscribeToMessages(activeConversationId, (newMsg) => {
+      setMessages((prev) => {
+        // Avoid duplicates (realtime can echo our own sent message)
+        if (prev.some(m => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+      if (newMsg.sender_id !== user.id) {
+        markMessagesAsRead(activeConversationId, user.id);
+      }
+    });
+
+    return unsub;
+  }, [activeConversationId, user]);
+
+  const handleSendMessage = async (text: string) => {
+    if (!user || !activeConversationId) return;
+    await sendMessage(activeConversationId, user.id, text);
+    // Realtime subscription will pick up the new message — no manual push needed
+>>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
   };
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId) || null;
@@ -439,7 +520,10 @@ const Messages = () => {
   );
 };
 
+<<<<<<< HEAD
 // Need supabase for cleanup
 import { supabase } from '@/integrations/supabase/client';
 
+=======
+>>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
 export default Messages;
