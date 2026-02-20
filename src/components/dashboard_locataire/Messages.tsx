@@ -1,9 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef } from 'react';
-<<<<<<< HEAD
-=======
 import { useLocation } from 'react-router-dom';
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
 import styles from './Messages.module.css';
 import { useAuthContext } from '@/context/AuthContext';
 import {
@@ -13,10 +10,7 @@ import {
   markMessagesAsRead,
   subscribeToMessages,
   subscribeToConversations,
-<<<<<<< HEAD
-=======
   getOrCreateConversation,
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
   type Conversation,
   type Message,
 } from '@/services/messagingService';
@@ -148,18 +142,9 @@ const ConversationsPanel = ({
     const otherParticipant = conv.participants?.find((p) => p.user_id !== currentUserId);
     const name = otherParticipant?.profile?.full_name || '';
     const lastMsg = conv.last_message_text || '';
-
-    const matchesSearch = !searchQuery ||
+    return !searchQuery ||
       name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       lastMsg.toLowerCase().includes(searchQuery.toLowerCase());
-
-    // For filter - we'll treat all as 'Agents' since tenant talks to agent
-    const matchesFilter =
-      activeFilter === 'Tous' ||
-      (activeFilter === 'Non lus' /* TODO: track unread per conv */) ||
-      activeFilter === 'Agents';
-
-    return matchesSearch;
   });
 
   return (
@@ -358,10 +343,7 @@ const ChatPanel = ({ conversation, messages, currentUserId, onSendMessage, loadi
 ========================================== */
 const Messages = () => {
   const { user } = useAuthContext();
-<<<<<<< HEAD
-=======
   const location = useLocation();
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -369,32 +351,15 @@ const Messages = () => {
   const [activeFilter, setActiveFilter] = useState('Tous');
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
-<<<<<<< HEAD
-=======
   const pendingContactRef = useRef(false);
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
 
   const today = new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 
-  // Load conversations
   const loadConversations = async () => {
-    if (!user) return;
+    if (!user) return [];
     const { data } = await getUserConversations(user.id);
     setConversations(data || []);
     setLoadingConvs(false);
-<<<<<<< HEAD
-    if (data && data.length > 0 && !activeConversationId) {
-      setActiveConversationId(data[0].id);
-    }
-  };
-
-  useEffect(() => {
-    if (!user) return;
-    loadConversations();
-
-    const unsub = subscribeToConversations(user.id, loadConversations);
-    return () => { supabase?.removeChannel?.(unsub); };
-=======
     return data || [];
   };
 
@@ -413,7 +378,6 @@ const Messages = () => {
       } else if (convs.length > 0) {
         setActiveConversationId(convs[0].id);
       }
-      // Clear navigation state so it doesn't re-trigger
       window.history.replaceState({}, '');
     })();
   }, [user, location.state]);
@@ -429,47 +393,20 @@ const Messages = () => {
 
     const unsub = subscribeToConversations(user.id, () => loadConversations());
     return unsub;
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
   }, [user]);
 
   // Load messages when active conversation changes
   useEffect(() => {
-<<<<<<< HEAD
-    if (!activeConversationId) return;
-=======
     if (!activeConversationId || !user) return;
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
     setLoadingMsgs(true);
     getConversationMessages(activeConversationId).then(({ data }) => {
       setMessages(data || []);
       setLoadingMsgs(false);
-<<<<<<< HEAD
-      if (user) markMessagesAsRead(activeConversationId, user.id);
-    });
-
-    const unsub = subscribeToMessages(activeConversationId, (newMsg) => {
-      setMessages((prev) => [...prev, newMsg]);
-      if (user) markMessagesAsRead(activeConversationId, user.id);
-    });
-
-    return () => { unsub?.unsubscribe?.(); };
-  }, [activeConversationId]);
-
-  const handleSendMessage = async (text: string) => {
-    if (!user || !activeConversationId) return;
-    const { data } = await sendMessage(activeConversationId, user.id, text);
-    if (data) {
-      setMessages((prev) => [...prev, data]);
-      // Refresh conversations to update last message
-      loadConversations();
-    }
-=======
       markMessagesAsRead(activeConversationId, user.id);
     });
 
     const unsub = subscribeToMessages(activeConversationId, (newMsg) => {
       setMessages((prev) => {
-        // Avoid duplicates (realtime can echo our own sent message)
         if (prev.some(m => m.id === newMsg.id)) return prev;
         return [...prev, newMsg];
       });
@@ -484,13 +421,11 @@ const Messages = () => {
   const handleSendMessage = async (text: string) => {
     if (!user || !activeConversationId) return;
     await sendMessage(activeConversationId, user.id, text);
-    // Realtime subscription will pick up the new message — no manual push needed
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
   };
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId) || null;
   const otherParticipant = activeConversation?.participants?.find((p) => p.user_id !== user?.id);
-  const unreadCount = 0; // TODO: track per-conversation
+  const unreadCount = 0;
 
   return (
     <>
@@ -520,10 +455,4 @@ const Messages = () => {
   );
 };
 
-<<<<<<< HEAD
-// Need supabase for cleanup
-import { supabase } from '@/integrations/supabase/client';
-
-=======
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
 export default Messages;

@@ -81,16 +81,8 @@ const PropertyDetail = () => {
     }
     if (!owner?.id) return;
     setContactingAgent(true);
-<<<<<<< HEAD
-    const currentUserId = session.session.user.id;
-    await getOrCreateConversation(currentUserId, owner.id);
     setContactingAgent(false);
-    navigate('/dashboard-locataire/messages');
-=======
-    setContactingAgent(false);
-    // Pass agent ID so Messages page can auto-create/open the conversation
     navigate('/dashboard-locataire/messages', { state: { agentId: owner.id } });
->>>>>>> de9e1c0de1ff7c61f11845f2f1bc775e3e4486f2
   };
 
   return (
