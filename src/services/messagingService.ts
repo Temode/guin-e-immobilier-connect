@@ -184,6 +184,23 @@ export function subscribeToConversations(userId: string, onUpdate: () => void) {
   };
 }
 
+/** Search users by name (excluding the current user) */
+export async function searchUsers(query: string, excludeUserId: string): Promise<{ data: { id: string; full_name: string | null; phone: string | null; avatar_url: string | null }[]; error: Error | null }> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, phone, avatar_url')
+      .ilike('full_name', `%${query}%`)
+      .neq('id', excludeUserId)
+      .limit(10);
+
+    if (error) throw error;
+    return { data: data || [], error: null };
+  } catch (err) {
+    return { data: [], error: err as Error };
+  }
+}
+
 /** Get unread message count for a conversation */
 export async function getUnreadCount(conversationId: string, userId: string): Promise<number> {
   const { count } = await supabase
