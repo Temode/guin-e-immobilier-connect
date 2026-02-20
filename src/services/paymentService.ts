@@ -242,7 +242,7 @@ export async function processRentPayment(params: {
   // The receiver wallet won't be credited in this mode, but the transaction is recorded.
   const { data: rental, error: rentalError } = await supabase
     .from('rentals')
-    .select('*, properties:property_id(agent_id, agent_commission_percent)')
+    .select('*')
     .eq('id', params.rentalId)
     .single();
 
@@ -250,7 +250,7 @@ export async function processRentPayment(params: {
     return { data: null, error: new Error('Location introuvable') };
   }
 
-  const agentId = (rental.properties as any)?.agent_id || null;
+  const agentId = rental.agent_id || null;
   const rentAmount = Number(rental.rent_amount);
   const reference = generateReference(params.paymentMethod || 'orange_money');
 

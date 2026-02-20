@@ -35,36 +35,47 @@ export async function initiateDjomyPayment(params: {
   paymentMethod: 'orange_money' | 'mtn_money';
   phoneNumber: string;
 }): Promise<DjomyPaymentResult> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    return { success: false, transactionId: null, djomyTransactionId: null, status: 'error', message: 'Non authentifié' };
-  }
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return { success: false, transactionId: null, djomyTransactionId: null, status: 'error', message: 'Non authentifié' };
+    }
 
-  const { data, error } = await supabase.functions.invoke('djomy-payment', {
-    body: {
-      rentalId: params.rentalId,
-      paymentMethod: params.paymentMethod,
-      phoneNumber: params.phoneNumber,
-    },
-  });
+    const { data, error } = await supabase.functions.invoke('djomy-payment', {
+      body: {
+        rentalId: params.rentalId,
+        paymentMethod: params.paymentMethod,
+        phoneNumber: params.phoneNumber,
+      },
+    });
 
-  if (error) {
+    if (error) {
+      return {
+        success: false,
+        transactionId: null,
+        djomyTransactionId: null,
+        status: 'unavailable',
+        message: 'Service Djomy non disponible',
+      };
+    }
+
+    return {
+      success: data?.success ?? false,
+      transactionId: data?.transactionId ?? null,
+      djomyTransactionId: data?.djomyTransactionId ?? null,
+      status: data?.status ?? 'error',
+      message: data?.message ?? 'Erreur inconnue',
+    };
+  } catch {
+    // CORS or network error — Edge Function not deployed
     return {
       success: false,
       transactionId: null,
       djomyTransactionId: null,
-      status: 'error',
-      message: error.message || 'Erreur lors de l\'initiation du paiement',
+      status: 'unavailable',
+      message: 'Service Djomy non disponible',
     };
   }
-
-  return {
-    success: data?.success ?? false,
-    transactionId: data?.transactionId ?? null,
-    djomyTransactionId: data?.djomyTransactionId ?? null,
-    status: data?.status ?? 'error',
-    message: data?.message ?? 'Erreur inconnue',
-  };
 }
 
 /**
