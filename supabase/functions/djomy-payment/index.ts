@@ -146,9 +146,12 @@ serve(async (req) => {
     }
 
     // Authenticate with Djomy
+    console.log('[DJOMY-PAYMENT] Starting Djomy auth...');
     const djomyToken = await getDjomyAuthToken();
+    console.log('[DJOMY-PAYMENT] Auth successful, token length:', djomyToken?.length);
 
     // Initiate payment via Djomy POST /v1/payments (direct, no redirect)
+    console.log('[DJOMY-PAYMENT] Initiating payment:', { method: djomyMethod, phone: formattedPhone, amount: rentAmount });
     const djomyResult = await initiateDjomyPayment({
       token: djomyToken,
       paymentMethod: djomyMethod,
@@ -157,6 +160,7 @@ serve(async (req) => {
       description: `Loyer Guin-e Immo - ${new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`,
       merchantPaymentReference: merchantPaymentRef,
     });
+    console.log('[DJOMY-PAYMENT] Payment result:', JSON.stringify(djomyResult));
 
     // Store Djomy transactionId in our transaction record
     await supabaseAdmin
