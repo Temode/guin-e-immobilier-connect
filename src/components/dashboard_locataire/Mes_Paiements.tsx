@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuthContext } from '@/context/AuthContext';
 import { getTenantActiveRental, daysUntilNextPayment, formatPaymentMethod, type RentalWithDetails } from '@/services/rentalService';
-import { getUserTransactions, getPaymentStats, formatAmount, getPaymentMethodInfo, getTransactionStatusInfo, type TransactionData } from '@/services/paymentService';
+import { getUserTransactions, processRentPayment, getPaymentStats, formatAmount, getPaymentMethodInfo, getTransactionStatusInfo, type TransactionData } from '@/services/paymentService';
 import { initiateDjomyPayment, pollPaymentStatus, type DjomyStatusResult } from '@/services/djomyService';
 import styles from './Mes_Paiements.module.css';
 
@@ -178,52 +178,63 @@ const PaymentModal = ({ isOpen, onClose, rental, onPaymentComplete }) => {
     setPollingMessage('');
 
     try {
-      // Step 1: Initiate payment via Djomy Edge Function
+      // Step 1: Try Djomy Edge Function first (requires Edge Function to be deployed + API credentials)
       const djomyResult = await initiateDjomyPayment({
         rentalId: rental.id,
         paymentMethod: selectedMethod as 'orange_money' | 'mtn_money',
         phoneNumber,
       });
 
-      if (!djomyResult.success || !djomyResult.transactionId) {
-        setResult({ success: false, message: djomyResult.message || 'Erreur lors de l\'initiation du paiement.' });
-        setIsProcessing(false);
+      if (djomyResult.success && djomyResult.transactionId) {
+        // Djomy is available — poll for confirmation
+        setIsPolling(true);
+        setPollingMessage('Validez le paiement sur votre téléphone...');
+
+        const finalStatus = await pollPaymentStatus({
+          transactionId: djomyResult.transactionId,
+          djomyTransactionId: djomyResult.djomyTransactionId || undefined,
+          onStatusChange: (status) => {
+            if (status.status === 'pending') {
+              setPollingMessage('En attente de validation sur votre téléphone...');
+            } else if (status.djomyStatus) {
+              setPollingMessage(`Statut Djomy: ${status.djomyStatus}`);
+            }
+          },
+          maxAttempts: 36,
+          intervalMs: 5000,
+        });
+
+        setIsPolling(false);
+
+        if (finalStatus.status === 'completed') {
+          setResult({ success: true, message: 'Paiement Djomy effectué avec succès !' });
+          onPaymentComplete?.();
+        } else if (finalStatus.status === 'failed') {
+          setResult({ success: false, message: 'Le paiement a échoué. Veuillez réessayer.' });
+        } else {
+          setResult({
+            success: false,
+            message: 'Paiement en cours. Vérifiez votre téléphone et consultez l\'historique.',
+          });
+          onPaymentComplete?.();
+        }
         return;
       }
 
-      // Step 2: Show "waiting for phone confirmation" state
-      setIsPolling(true);
-      setPollingMessage('Validez le paiement sur votre téléphone...');
-
-      // Step 3: Poll for payment status
-      const finalStatus = await pollPaymentStatus({
-        transactionId: djomyResult.transactionId,
-        djomyTransactionId: djomyResult.djomyTransactionId || undefined,
-        onStatusChange: (status) => {
-          if (status.status === 'pending') {
-            setPollingMessage('En attente de validation sur votre téléphone...');
-          } else if (status.djomyStatus) {
-            setPollingMessage(`Statut Djomy: ${status.djomyStatus}`);
-          }
-        },
-        maxAttempts: 36,  // ~3 minutes at 5s intervals
-        intervalMs: 5000,
+      // Step 2: Fallback — Djomy Edge Function non disponible, utiliser le mode simulation
+      // (works without Edge Functions or Djomy API credentials)
+      setPollingMessage('Traitement en mode simulation...');
+      const { data, error } = await processRentPayment({
+        rentalId: rental.id,
+        paymentMethod: selectedMethod as 'orange_money' | 'mtn_money',
+        phoneNumber,
       });
 
-      setIsPolling(false);
-
-      if (finalStatus.status === 'completed') {
+      if (error || !data?.success) {
+        setResult({ success: false, message: error?.message || 'Le paiement a échoué. Veuillez réessayer.' });
+      } else {
         setResult({ success: true, message: 'Paiement effectué avec succès !' });
         onPaymentComplete?.();
-      } else if (finalStatus.status === 'failed') {
-        setResult({ success: false, message: 'Le paiement a échoué. Veuillez réessayer.' });
-      } else {
-        // Still pending after timeout
-        setResult({
-          success: false,
-          message: 'Le paiement est toujours en cours. Vérifiez votre téléphone et consultez l\'historique.',
-        });
-        onPaymentComplete?.(); // Refresh data anyway
       }
     } catch (err) {
       setIsPolling(false);
@@ -282,7 +293,7 @@ const PaymentModal = ({ isOpen, onClose, rental, onPaymentComplete }) => {
           </div>
 
           <div className={styles.sandboxBanner}>
-            ⚡ Mode Test Djomy — Le paiement est traité via Djomy en mode sandbox.
+            ⚡ Mode Test — Paiement via Djomy (OM/MOMO) ou simulation si non disponible.
           </div>
 
           {isPolling && (
