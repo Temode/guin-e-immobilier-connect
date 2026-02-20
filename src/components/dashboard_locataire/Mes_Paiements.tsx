@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuthContext } from '@/context/AuthContext';
 import { getTenantActiveRental, daysUntilNextPayment, formatPaymentMethod, type RentalWithDetails } from '@/services/rentalService';
-import { getUserTransactions, simulateRentPayment, getPaymentStats, formatAmount, getPaymentMethodInfo, getTransactionStatusInfo, type TransactionData } from '@/services/paymentService';
+import { getUserTransactions, processRentPayment, getPaymentStats, formatAmount, getPaymentMethodInfo, getTransactionStatusInfo, type TransactionData } from '@/services/paymentService';
 import styles from './Mes_Paiements.module.css';
 
 /* ==========================================
@@ -175,25 +175,19 @@ const PaymentModal = ({ isOpen, onClose, rental, onPaymentComplete }) => {
     setIsProcessing(true);
     setResult(null);
     try {
-      const { data, error } = await simulateRentPayment({
+      const { data, error } = await processRentPayment({
         rentalId: rental.id,
-        payerId: rental.tenant_id,
-        receiverId: rental.owner_id,
-        amount: rental.rent_amount,
-        currency: rental.currency,
-        paymentMethod: selectedMethod,
-        description: `Loyer - ${new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`,
+        paymentMethod: selectedMethod as 'orange_money' | 'mtn_money' | 'visa' | 'mastercard' | 'bank',
         phoneNumber: !isCardMethod ? phoneNumber : undefined,
-        cardLast4: isCardMethod ? cardNumber.slice(-4) : undefined,
       });
 
       if (error) {
         setResult({ success: false, message: error.message });
-      } else if (data?.status === 'completed') {
+      } else if (data?.success) {
         setResult({ success: true, message: 'Paiement effectué avec succès !' });
         onPaymentComplete?.();
       } else {
-        setResult({ success: false, message: (data?.metadata as any)?.failure_reason || 'Le paiement a échoué.' });
+        setResult({ success: false, message: 'Le paiement a échoué. Veuillez réessayer.' });
       }
     } catch (err) {
       setResult({ success: false, message: 'Erreur inattendue.' });

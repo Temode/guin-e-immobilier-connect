@@ -119,46 +119,29 @@ export async function simulateRentPayment(params: {
 
   if (txErr) return { data: null, error: txErr };
 
-  // Simulate processing delay (1-2 seconds)
+  // Simulate processing delay
   await new Promise(resolve => setTimeout(resolve, 1500));
 
-  // Simulate success (90% chance) or failure (10% chance)
-  const isSuccess = Math.random() > 0.1;
-  const finalStatus = isSuccess ? 'completed' : 'failed';
+  // Use SECURITY DEFINER RPC to atomically update status + credit receiver wallet
+  // (bypasses RLS which would prevent updating another user's wallet)
+  const { data: rpcResult, error: rpcErr } = await supabase
+    .rpc('complete_sandbox_payment', {
+      p_transaction_id: transaction.id,
+      p_is_success: Math.random() > 0.1,
+    });
 
-  const { data: updated, error: updateErr } = await supabase
+  if (rpcErr) return { data: null, error: rpcErr };
+
+  const isSuccess = (rpcResult as any)?.status === 'completed';
+
+  // Fetch the final transaction state
+  const { data: updated, error: fetchErr } = await supabase
     .from('transactions')
-    .update({
-      status: finalStatus,
-      metadata: {
-        ...(transaction.metadata as Record<string, unknown>),
-        sandbox: true,
-        processed_at: new Date().toISOString(),
-        failure_reason: isSuccess ? null : 'Solde insuffisant (simulation)',
-      },
-    })
+    .select('*')
     .eq('id', transaction.id)
-    .select()
     .single();
 
-  if (updateErr) return { data: null, error: updateErr };
-
-  // If success, update wallets
-  if (isSuccess) {
-    // Credit receiver wallet
-    const { data: receiverWallet } = await supabase
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', params.receiverId)
-      .single();
-
-    if (receiverWallet) {
-      await supabase
-        .from('wallets')
-        .update({ balance: Number(receiverWallet.balance) + params.amount })
-        .eq('user_id', params.receiverId);
-    }
-  }
+  if (fetchErr) return { data: null, error: fetchErr };
 
   return {
     data: updated ? { ...updated, amount: Number(updated.amount) } as TransactionData : null,
@@ -203,7 +186,7 @@ function generateReference(method: string): string {
 }
 
 /**
- * Simulate a withdrawal (sandbox mode)
+ * Simulate a withdrawal (sandbox mode) — uses withdraw_funds RPC
  */
 export async function simulateWithdrawal(params: {
   userId: string;
@@ -213,78 +196,84 @@ export async function simulateWithdrawal(params: {
   phoneNumber?: string;
   bankAccount?: string;
 }): Promise<{ data: TransactionData | null; error: Error | null }> {
-  // Verify wallet balance
-  const { data: wallet, error: walletErr } = await getOrCreateWallet(params.userId);
-  if (walletErr || !wallet) return { data: null, error: walletErr || new Error('Portefeuille introuvable') };
+  return withdrawFunds({
+    amount: params.amount,
+    method: params.withdrawMethod,
+    phoneNumber: params.phoneNumber,
+    bankAccount: params.bankAccount,
+  });
+}
 
-  const platformFee = Math.round(params.amount * 0.05);
-  const netAmount = params.amount - platformFee;
+/**
+ * Process a rent payment via SECURITY DEFINER RPC (Phase 4.2)
+ * Handles commission split agent/owner, wallet updates, and transaction records
+ */
+export async function processRentPayment(params: {
+  rentalId: string;
+  paymentMethod?: 'orange_money' | 'mtn_money' | 'visa' | 'mastercard' | 'bank';
+  phoneNumber?: string;
+}): Promise<{
+  data: { success: boolean; transactionId: string | null; ownerAmount: number; agentAmount: number; status: string } | null;
+  error: Error | null;
+}> {
+  const { data: rpcResult, error } = await supabase.rpc('process_rent_payment', {
+    p_rental_id: params.rentalId,
+    p_payment_method: params.paymentMethod || 'orange_money',
+    p_phone_number: params.phoneNumber || null,
+  });
 
-  if (wallet.balance < params.amount) {
-    return { data: null, error: new Error('Solde insuffisant pour ce retrait') };
-  }
+  if (error) return { data: null, error };
 
-  const reference = generateReference(params.withdrawMethod);
+  const result = rpcResult as any;
+  return {
+    data: {
+      success: result?.success ?? false,
+      transactionId: result?.transaction_id ?? null,
+      ownerAmount: Number(result?.owner_amount ?? 0),
+      agentAmount: Number(result?.agent_amount ?? 0),
+      status: result?.status ?? 'failed',
+    },
+    error: result?.success ? null : new Error(result?.failure_reason || 'Paiement échoué'),
+  };
+}
 
-  // Create withdrawal transaction as pending
-  const { data: transaction, error: txErr } = await supabase
-    .from('transactions')
-    .insert({
-      payer_id: params.userId,
-      receiver_id: params.userId,
-      amount: params.amount,
-      currency: params.currency,
-      payment_method: params.withdrawMethod,
-      payment_reference: reference,
-      type: 'withdrawal',
-      status: 'pending',
-      description: 'Retrait de fonds',
-      metadata: {
-        sandbox: true,
-        phone_number: params.phoneNumber || null,
-        bank_account: params.bankAccount || null,
-        platform_fee: platformFee,
-        net_amount: netAmount,
-      },
-    })
-    .select()
-    .single();
-
-  if (txErr) return { data: null, error: txErr };
-
-  // Simulate processing delay
+/**
+ * Withdraw funds from wallet via SECURITY DEFINER RPC (Phase 4.2)
+ * Commission rate depends on subscription plan:
+ *   - free: ~9%  | basic: ~5.5%  | pro: ~3.5%  | enterprise: ~1.5%
+ */
+export async function withdrawFunds(params: {
+  amount: number;
+  method: 'orange_money' | 'mtn_money' | 'bank';
+  phoneNumber?: string;
+  bankAccount?: string;
+}): Promise<{ data: TransactionData | null; error: Error | null }> {
+  // Simulate delay
   await new Promise(resolve => setTimeout(resolve, 2000));
 
-  // Simulate success (85% chance)
-  const isSuccess = Math.random() > 0.15;
-  const finalStatus = isSuccess ? 'completed' : 'failed';
+  const { data: rpcResult, error } = await supabase.rpc('withdraw_funds', {
+    p_amount: params.amount,
+    p_method: params.method,
+    p_phone_number: params.phoneNumber || null,
+    p_bank_account: params.bankAccount || null,
+  });
 
-  const { data: updated, error: updateErr } = await supabase
-    .from('transactions')
-    .update({
-      status: finalStatus,
-      metadata: {
-        ...(transaction.metadata as Record<string, unknown>),
-        processed_at: new Date().toISOString(),
-        failure_reason: isSuccess ? null : 'Échec du transfert (simulation)',
-      },
-    })
-    .eq('id', transaction.id)
-    .select()
-    .single();
+  if (error) return { data: null, error };
 
-  if (updateErr) return { data: null, error: updateErr };
-
-  // If success, debit wallet
-  if (isSuccess) {
-    await supabase
-      .from('wallets')
-      .update({ balance: wallet.balance - params.amount })
-      .eq('user_id', params.userId);
+  const result = rpcResult as any;
+  if (!result?.success) {
+    return { data: null, error: new Error(result?.failure_reason || result?.error || 'Retrait échoué') };
   }
 
+  // Fetch the created transaction
+  const { data: tx } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('id', result.transaction_id)
+    .single();
+
   return {
-    data: updated ? { ...updated, amount: Number(updated.amount) } as TransactionData : null,
+    data: tx ? { ...tx, amount: Number(tx.amount) } as TransactionData : null,
     error: null,
   };
 }
