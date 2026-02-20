@@ -11,6 +11,7 @@ import {
   subscribeToMessages,
   subscribeToConversations,
   getOrCreateConversation,
+  searchUsers,
   type Conversation,
   type Message,
 } from '@/services/messagingService';
@@ -40,6 +41,18 @@ const SendIcon = ({ className }) => (
 const VerifiedBadgeIcon = ({ className }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
     <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+  </svg>
+);
+
+const PlusIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+  </svg>
+);
+
+const CloseIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
   </svg>
 );
 
@@ -119,6 +132,109 @@ const Header = ({ date }) => (
 );
 
 /* ==========================================
+   NEW CONVERSATION MODAL
+========================================== */
+const NewConversationModal = ({ currentUserId, onClose, onConversationCreated }) => {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!query.trim() || query.length < 2) { setResults([]); return; }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      const { data } = await searchUsers(query, currentUserId);
+      setResults(data);
+      setLoading(false);
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query, currentUserId]);
+
+  const handleSelect = async (userId: string) => {
+    setCreating(userId);
+    const { data: convId } = await getOrCreateConversation(currentUserId, userId);
+    setCreating(null);
+    if (convId) {
+      onConversationCreated(convId);
+      onClose();
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.4)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }} onClick={onClose}>
+      <div style={{
+        background: 'white', borderRadius: '16px', width: '400px', maxWidth: '90vw',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.2)', overflow: 'hidden',
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h3 style={{ fontWeight: 700, fontSize: '1.1rem', color: '#0F172A', margin: 0 }}>Nouvelle conversation</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B', display: 'flex', alignItems: 'center' }}>
+            <CloseIcon style={{ width: 20, height: 20 }} />
+          </button>
+        </div>
+        <div style={{ padding: '16px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', border: '1px solid #E2E8F0', borderRadius: 10, background: '#F8FAFC', marginBottom: 12 }}>
+            <SearchIcon style={{ width: 18, height: 18, color: '#94A3B8', flexShrink: 0 }} />
+            <input
+              autoFocus
+              type="text"
+              placeholder="Rechercher un utilisateur..."
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              style={{ border: 'none', outline: 'none', background: 'transparent', fontSize: '0.9rem', color: '#1E293B', width: '100%' }}
+            />
+          </div>
+          <div style={{ maxHeight: 280, overflowY: 'auto' }}>
+            {loading && <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: '0.875rem', padding: '16px 0' }}>Recherche...</p>}
+            {!loading && query.length >= 2 && results.length === 0 && (
+              <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: '0.875rem', padding: '16px 0' }}>Aucun utilisateur trouvé</p>
+            )}
+            {!loading && query.length < 2 && (
+              <p style={{ textAlign: 'center', color: '#CBD5E1', fontSize: '0.85rem', padding: '16px 0' }}>Tapez au moins 2 caractères</p>
+            )}
+            {results.map(user => (
+              <div key={user.id}
+                onClick={() => !creating && handleSelect(user.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
+                  borderRadius: 10, cursor: creating ? 'wait' : 'pointer',
+                  opacity: creating === user.id ? 0.7 : 1,
+                  transition: '150ms',
+                  background: creating === user.id ? '#F0FDF4' : 'transparent',
+                }}
+                onMouseEnter={e => { if (!creating) e.currentTarget.style.background = '#F8FAFC'; }}
+                onMouseLeave={e => { if (!creating) e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div style={{
+                  width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+                  background: 'linear-gradient(135deg, #4ADE80, #047857)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'white', fontWeight: 600, fontSize: '0.9rem',
+                }}>
+                  {user.avatar_url ? <img src={user.avatar_url} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} /> : getInitials(user.full_name)}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontWeight: 600, color: '#1E293B', margin: 0, fontSize: '0.9rem' }}>{user.full_name || 'Utilisateur'}</p>
+                  {user.phone && <p style={{ color: '#64748B', margin: 0, fontSize: '0.8rem' }}>{user.phone}</p>}
+                </div>
+                {creating === user.id && <span style={{ fontSize: '0.8rem', color: '#10B981' }}>...</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ==========================================
    CONVERSATIONS PANEL
 ========================================== */
 const ConversationsPanel = ({
@@ -131,6 +247,7 @@ const ConversationsPanel = ({
   onFilterChange,
   unreadCount,
   currentUserId,
+  onNewConversation,
 }) => {
   const filters = [
     { id: 'Tous', label: 'Tous' },
@@ -150,7 +267,23 @@ const ConversationsPanel = ({
   return (
     <div className={styles.conversationsPanel}>
       <div className={styles.conversationsHeader}>
-        <h3>Conversations</h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h3>Conversations</h3>
+          <button
+            onClick={onNewConversation}
+            title="Nouvelle conversation"
+            style={{
+              width: 32, height: 32, borderRadius: 8,
+              border: '1px solid #E2E8F0', background: 'white',
+              color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', transition: '150ms',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#F0FDF4'}
+            onMouseLeave={e => e.currentTarget.style.background = 'white'}
+          >
+            <PlusIcon style={{ width: 16, height: 16 }} />
+          </button>
+        </div>
       </div>
       <div className={styles.searchBar}>
         <SearchIcon />
@@ -342,6 +475,7 @@ const ChatPanel = ({ conversation, messages, currentUserId, onSendMessage, loadi
    MAIN MESSAGES COMPONENT
 ========================================== */
 const Messages = () => {
+  const [showNewConvModal, setShowNewConvModal] = useState(false);
   const { user } = useAuthContext();
   const location = useLocation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -427,8 +561,20 @@ const Messages = () => {
   const otherParticipant = activeConversation?.participants?.find((p) => p.user_id !== user?.id);
   const unreadCount = 0;
 
+  const handleNewConversationCreated = async (convId: string) => {
+    const convs = await loadConversations();
+    setActiveConversationId(convId);
+  };
+
   return (
     <>
+      {showNewConvModal && user && (
+        <NewConversationModal
+          currentUserId={user.id}
+          onClose={() => setShowNewConvModal(false)}
+          onConversationCreated={handleNewConversationCreated}
+        />
+      )}
       <Header date={today} />
       <div className={styles.messagesContainer}>
         <ConversationsPanel
@@ -441,6 +587,7 @@ const Messages = () => {
           onFilterChange={setActiveFilter}
           unreadCount={unreadCount}
           currentUserId={user?.id}
+          onNewConversation={() => setShowNewConvModal(true)}
         />
         <ChatPanel
           conversation={activeConversation}
