@@ -74,24 +74,25 @@ serve(async (req) => {
     // Use admin client for DB operations (bypasses RLS)
     const supabaseAdmin = getSupabaseAdmin();
 
-    // Fetch the rental with property info
+    // Fetch the rental (agent_id and agent_commission_percent are directly on rentals)
     const { data: rental, error: rentalError } = await supabaseAdmin
       .from('rentals')
-      .select('*, properties:property_id(agent_id, agent_commission_percent)')
+      .select('*')
       .eq('id', rentalId)
       .eq('tenant_id', user.id)
       .eq('status', 'active')
       .single();
 
     if (rentalError || !rental) {
-      return new Response(JSON.stringify({ error: 'Location introuvable ou non active' }), {
+      console.error('Rental not found:', rentalError?.message, { rentalId, userId: user.id });
+      return new Response(JSON.stringify({ error: 'Location introuvable ou non active', details: rentalError?.message }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Determine the receiver (agent_id for now; owner not integrated yet)
-    const agentId = rental.properties?.agent_id || rental.agent_id;
+    // Determine the receiver (agent_id from rental directly)
+    const agentId = rental.agent_id || rental.owner_id;
     if (!agentId) {
       return new Response(JSON.stringify({ error: 'Aucun agent associé à cette propriété' }), {
         status: 400,
@@ -131,7 +132,7 @@ serve(async (req) => {
           phone_number: formattedPhone,
           merchant_payment_reference: merchantPaymentRef,
           full_rent: rentAmount,
-          agent_commission_pct: rental.properties?.agent_commission_percent || 0,
+          agent_commission_pct: rental.agent_commission_percent || 0,
         },
       })
       .select()
