@@ -415,7 +415,10 @@ const AgentMessages = () => {
     if (!activeConversationId || !user) return;
 
     const unsub = subscribeToMessages(activeConversationId, (newMsg) => {
-      setMessages(prev => [...prev, newMsg]);
+      setMessages(prev => {
+        if (prev.some(m => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
       if (newMsg.sender_id !== user.id) {
         markMessagesAsRead(activeConversationId, user.id);
       }

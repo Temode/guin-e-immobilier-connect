@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import styles from './Messages.module.css';
 import { useAuthContext } from '@/context/AuthContext';
 import {
@@ -9,6 +10,7 @@ import {
   markMessagesAsRead,
   subscribeToMessages,
   subscribeToConversations,
+  getOrCreateConversation,
   type Conversation,
   type Message,
 } from '@/services/messagingService';
@@ -350,6 +352,7 @@ const ChatPanel = ({ conversation, messages, currentUserId, onSendMessage, loadi
 ========================================== */
 const Messages = () => {
   const { user } = useAuthContext();
+  const location = useLocation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -357,6 +360,7 @@ const Messages = () => {
   const [activeFilter, setActiveFilter] = useState('Tous');
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const pendingContactRef = useRef(false);
 
   const today = new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -366,45 +370,70 @@ const Messages = () => {
     const { data } = await getUserConversations(user.id);
     setConversations(data || []);
     setLoadingConvs(false);
-    if (data && data.length > 0 && !activeConversationId) {
-      setActiveConversationId(data[0].id);
-    }
+    return data || [];
   };
 
+  // Handle navigation from PropertyDetail — auto-create/open conversation with agent
+  useEffect(() => {
+    if (!user || pendingContactRef.current) return;
+    const state = location.state as { agentId?: string } | null;
+    if (!state?.agentId) return;
+
+    pendingContactRef.current = true;
+    (async () => {
+      const { data: convId } = await getOrCreateConversation(user.id, state.agentId);
+      const convs = await loadConversations();
+      if (convId) {
+        setActiveConversationId(convId);
+      } else if (convs.length > 0) {
+        setActiveConversationId(convs[0].id);
+      }
+      // Clear navigation state so it doesn't re-trigger
+      window.history.replaceState({}, '');
+    })();
+  }, [user, location.state]);
+
+  // Load conversations on mount
   useEffect(() => {
     if (!user) return;
-    loadConversations();
+    loadConversations().then((data) => {
+      if (data && data.length > 0 && !activeConversationId) {
+        setActiveConversationId(data[0].id);
+      }
+    });
 
-    const unsub = subscribeToConversations(user.id, loadConversations);
-    return () => { supabase?.removeChannel?.(unsub); };
+    const unsub = subscribeToConversations(user.id, () => loadConversations());
+    return unsub;
   }, [user]);
 
   // Load messages when active conversation changes
   useEffect(() => {
-    if (!activeConversationId) return;
+    if (!activeConversationId || !user) return;
     setLoadingMsgs(true);
     getConversationMessages(activeConversationId).then(({ data }) => {
       setMessages(data || []);
       setLoadingMsgs(false);
-      if (user) markMessagesAsRead(activeConversationId, user.id);
+      markMessagesAsRead(activeConversationId, user.id);
     });
 
     const unsub = subscribeToMessages(activeConversationId, (newMsg) => {
-      setMessages((prev) => [...prev, newMsg]);
-      if (user) markMessagesAsRead(activeConversationId, user.id);
+      setMessages((prev) => {
+        // Avoid duplicates (realtime can echo our own sent message)
+        if (prev.some(m => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+      if (newMsg.sender_id !== user.id) {
+        markMessagesAsRead(activeConversationId, user.id);
+      }
     });
 
-    return () => { unsub?.unsubscribe?.(); };
-  }, [activeConversationId]);
+    return unsub;
+  }, [activeConversationId, user]);
 
   const handleSendMessage = async (text: string) => {
     if (!user || !activeConversationId) return;
-    const { data } = await sendMessage(activeConversationId, user.id, text);
-    if (data) {
-      setMessages((prev) => [...prev, data]);
-      // Refresh conversations to update last message
-      loadConversations();
-    }
+    await sendMessage(activeConversationId, user.id, text);
+    // Realtime subscription will pick up the new message — no manual push needed
   };
 
   const activeConversation = conversations.find((c) => c.id === activeConversationId) || null;
@@ -438,8 +467,5 @@ const Messages = () => {
     </>
   );
 };
-
-// Need supabase for cleanup
-import { supabase } from '@/integrations/supabase/client';
 
 export default Messages;
