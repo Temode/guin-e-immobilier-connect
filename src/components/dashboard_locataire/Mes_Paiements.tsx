@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuthContext } from '@/context/AuthContext';
 import { getTenantActiveRental, daysUntilNextPayment, formatPaymentMethod, type RentalWithDetails } from '@/services/rentalService';
-import { getUserTransactions, processRentPayment, getPaymentStats, formatAmount, getPaymentMethodInfo, getTransactionStatusInfo, type TransactionData } from '@/services/paymentService';
+import { getUserTransactions, getPaymentStats, formatAmount, getPaymentMethodInfo, getTransactionStatusInfo, type TransactionData } from '@/services/paymentService';
+import { initiateDjomyPayment, pollPaymentStatus, type DjomyStatusResult } from '@/services/djomyService';
 import styles from './Mes_Paiements.module.css';
 
 /* ==========================================
@@ -154,10 +155,9 @@ const Header = ({ date, hasNotifications }) => (
 const PaymentModal = ({ isOpen, onClose, rental, onPaymentComplete }) => {
   const [selectedMethod, setSelectedMethod] = useState('orange_money');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
+  const [pollingMessage, setPollingMessage] = useState('');
   const [result, setResult] = useState(null);
 
   if (!isOpen || !rental) return null;
@@ -165,43 +165,82 @@ const PaymentModal = ({ isOpen, onClose, rental, onPaymentComplete }) => {
   const paymentMethods = [
     { id: 'orange_money', label: 'Orange Money', icon: '🟠' },
     { id: 'mtn_money', label: 'MTN Money', icon: '🟡' },
-    { id: 'visa', label: 'Visa', icon: '💳' },
-    { id: 'mastercard', label: 'Mastercard', icon: '💳' },
   ];
 
-  const isCardMethod = selectedMethod === 'visa' || selectedMethod === 'mastercard';
-
   const handlePay = async () => {
+    if (!phoneNumber.trim()) {
+      setResult({ success: false, message: 'Veuillez saisir votre numéro de téléphone.' });
+      return;
+    }
+
     setIsProcessing(true);
     setResult(null);
+    setPollingMessage('');
+
     try {
-      const { data, error } = await processRentPayment({
+      // Step 1: Initiate payment via Djomy Edge Function
+      const djomyResult = await initiateDjomyPayment({
         rentalId: rental.id,
-        paymentMethod: selectedMethod as 'orange_money' | 'mtn_money' | 'visa' | 'mastercard' | 'bank',
-        phoneNumber: !isCardMethod ? phoneNumber : undefined,
+        paymentMethod: selectedMethod as 'orange_money' | 'mtn_money',
+        phoneNumber,
       });
 
-      if (error) {
-        setResult({ success: false, message: error.message });
-      } else if (data?.success) {
+      if (!djomyResult.success || !djomyResult.transactionId) {
+        setResult({ success: false, message: djomyResult.message || 'Erreur lors de l\'initiation du paiement.' });
+        setIsProcessing(false);
+        return;
+      }
+
+      // Step 2: Show "waiting for phone confirmation" state
+      setIsPolling(true);
+      setPollingMessage('Validez le paiement sur votre téléphone...');
+
+      // Step 3: Poll for payment status
+      const finalStatus = await pollPaymentStatus({
+        transactionId: djomyResult.transactionId,
+        djomyTransactionId: djomyResult.djomyTransactionId || undefined,
+        onStatusChange: (status) => {
+          if (status.status === 'pending') {
+            setPollingMessage('En attente de validation sur votre téléphone...');
+          } else if (status.djomyStatus) {
+            setPollingMessage(`Statut Djomy: ${status.djomyStatus}`);
+          }
+        },
+        maxAttempts: 36,  // ~3 minutes at 5s intervals
+        intervalMs: 5000,
+      });
+
+      setIsPolling(false);
+
+      if (finalStatus.status === 'completed') {
         setResult({ success: true, message: 'Paiement effectué avec succès !' });
         onPaymentComplete?.();
-      } else {
+      } else if (finalStatus.status === 'failed') {
         setResult({ success: false, message: 'Le paiement a échoué. Veuillez réessayer.' });
+      } else {
+        // Still pending after timeout
+        setResult({
+          success: false,
+          message: 'Le paiement est toujours en cours. Vérifiez votre téléphone et consultez l\'historique.',
+        });
+        onPaymentComplete?.(); // Refresh data anyway
       }
     } catch (err) {
+      setIsPolling(false);
       setResult({ success: false, message: 'Erreur inattendue.' });
     } finally {
       setIsProcessing(false);
     }
   };
 
+  const isBusy = isProcessing || isPolling;
+
   return (
-    <div className={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && !isProcessing && onClose()}>
+    <div className={styles.modalOverlay} onClick={(e) => e.target === e.currentTarget && !isBusy && onClose()}>
       <div className={styles.modalContent}>
         <div className={styles.modalHeader}>
           <h3>Payer mon loyer</h3>
-          <button className={styles.modalCloseBtn} onClick={onClose} disabled={isProcessing}>
+          <button className={styles.modalCloseBtn} onClick={onClose} disabled={isBusy}>
             <XIcon />
           </button>
         </div>
@@ -221,7 +260,7 @@ const PaymentModal = ({ isOpen, onClose, rental, onPaymentComplete }) => {
                   key={pm.id}
                   className={`${styles.paymentMethodOption} ${selectedMethod === pm.id ? styles.selected : ''}`}
                   onClick={() => setSelectedMethod(pm.id)}
-                  disabled={isProcessing}
+                  disabled={isBusy}
                 >
                   <span className={styles.paymentMethodEmoji}>{pm.icon}</span>
                   <span>{pm.label}</span>
@@ -230,63 +269,28 @@ const PaymentModal = ({ isOpen, onClose, rental, onPaymentComplete }) => {
             </div>
           </div>
 
-          {!isCardMethod && (
-            <div className={styles.formGroup}>
-              <label className={styles.formLabel}>Numéro de téléphone</label>
-              <input
-                type="tel"
-                className={styles.formInput}
-                placeholder="+224 6XX XX XX XX"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                disabled={isProcessing}
-              />
-            </div>
-          )}
-
-          {isCardMethod && (
-            <>
-              <div className={styles.formGroup}>
-                <label className={styles.formLabel}>Numéro de carte</label>
-                <input
-                  type="text"
-                  className={styles.formInput}
-                  placeholder="4242 4242 4242 4242"
-                  value={cardNumber}
-                  onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, '').slice(0, 16))}
-                  disabled={isProcessing}
-                />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div className={styles.formGroup}>
-                  <label className={styles.formLabel}>Expiration</label>
-                  <input
-                    type="text"
-                    className={styles.formInput}
-                    placeholder="MM/AA"
-                    value={cardExpiry}
-                    onChange={(e) => setCardExpiry(e.target.value)}
-                    disabled={isProcessing}
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label className={styles.formLabel}>CVC</label>
-                  <input
-                    type="text"
-                    className={styles.formInput}
-                    placeholder="123"
-                    value={cardCvc}
-                    onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    disabled={isProcessing}
-                  />
-                </div>
-              </div>
-            </>
-          )}
+          <div className={styles.formGroup}>
+            <label className={styles.formLabel}>Numéro de téléphone</label>
+            <input
+              type="tel"
+              className={styles.formInput}
+              placeholder="+224 6XX XX XX XX"
+              value={phoneNumber}
+              onChange={(e) => setPhoneNumber(e.target.value)}
+              disabled={isBusy}
+            />
+          </div>
 
           <div className={styles.sandboxBanner}>
-            ⚡ Mode Sandbox — Le paiement est simulé. Aucun prélèvement réel.
+            ⚡ Mode Test Djomy — Le paiement est traité via Djomy en mode sandbox.
           </div>
+
+          {isPolling && (
+            <div className={styles.resultBanner} style={{ background: 'var(--color-primary-50, #eff6ff)', color: 'var(--color-primary-600, #2563eb)', border: '1px solid var(--color-primary-200, #bfdbfe)' }}>
+              <LoaderIcon />
+              <span>{pollingMessage}</span>
+            </div>
+          )}
 
           {result && (
             <div className={`${styles.resultBanner} ${result.success ? styles.resultSuccess : styles.resultError}`}>
@@ -297,18 +301,23 @@ const PaymentModal = ({ isOpen, onClose, rental, onPaymentComplete }) => {
         </div>
 
         <div className={styles.modalFooter}>
-          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={onClose} disabled={isProcessing}>
+          <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={onClose} disabled={isBusy}>
             Annuler
           </button>
           <button
             className={`${styles.btn} ${styles.btnPrimary}`}
             onClick={handlePay}
-            disabled={isProcessing || (result && result.success)}
+            disabled={isBusy || (result && result.success)}
           >
-            {isProcessing ? (
+            {isPolling ? (
               <>
                 <LoaderIcon />
-                Traitement en cours...
+                Validation en cours...
+              </>
+            ) : isProcessing ? (
+              <>
+                <LoaderIcon />
+                Connexion à Djomy...
               </>
             ) : result?.success ? (
               <>
@@ -318,7 +327,7 @@ const PaymentModal = ({ isOpen, onClose, rental, onPaymentComplete }) => {
             ) : (
               <>
                 <PaymentIcon />
-                Confirmer le paiement
+                Payer via {selectedMethod === 'orange_money' ? 'Orange Money' : 'MTN Money'}
               </>
             )}
           </button>
