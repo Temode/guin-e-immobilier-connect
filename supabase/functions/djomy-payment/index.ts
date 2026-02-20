@@ -101,7 +101,8 @@ serve(async (req) => {
 
     const rentAmount = Number(rental.rent_amount);
     const currency = rental.currency || 'GNF';
-    const merchantTxId = `RENT-${rentalId.slice(0, 8)}-${Date.now()}`;
+    // merchantPaymentReference = the field Djomy uses to link back to our transaction
+    const merchantPaymentRef = `RENT-${rentalId.slice(0, 8)}-${Date.now()}`;
 
     // Format phone number for Djomy (ensure international format: 00224...)
     let formattedPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
@@ -111,11 +112,7 @@ serve(async (req) => {
       formattedPhone = '00224' + formattedPhone;
     }
 
-    // Webhook callback URL (this project's djomy-webhook Edge Function)
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const callbackUrl = `${supabaseUrl}/functions/v1/djomy-webhook`;
-
-    // Create pending transaction in DB
+    // Create pending transaction in DB (before calling Djomy, so we have a record)
     const { data: transaction, error: txError } = await supabaseAdmin
       .from('transactions')
       .insert({
@@ -125,14 +122,14 @@ serve(async (req) => {
         amount: rentAmount,
         currency,
         payment_method: paymentMethod,
-        payment_reference: merchantTxId,
+        payment_reference: merchantPaymentRef,
         type: 'rent_payment',
         status: 'pending',
         description: `Loyer - ${new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`,
         metadata: {
           djomy: true,
           phone_number: formattedPhone,
-          merchant_transaction_id: merchantTxId,
+          merchant_payment_reference: merchantPaymentRef,
           full_rent: rentAmount,
           agent_commission_pct: rental.properties?.agent_commission_percent || 0,
         },
@@ -150,16 +147,14 @@ serve(async (req) => {
     // Authenticate with Djomy
     const djomyToken = await getDjomyAuthToken();
 
-    // Initiate payment via Djomy
+    // Initiate payment via Djomy POST /v1/payments (direct, no redirect)
     const djomyResult = await initiateDjomyPayment({
       token: djomyToken,
       paymentMethod: djomyMethod,
       payerIdentifier: formattedPhone,
       amount: rentAmount,
-      currency,
-      description: `Loyer ${rental.property_id?.toString().slice(0, 8) || ''} - Guin-e Immobilier`,
-      merchantTransactionId: merchantTxId,
-      callbackUrl,
+      description: `Loyer Guin-e Immo - ${new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`,
+      merchantPaymentReference: merchantPaymentRef,
     });
 
     // Store Djomy transactionId in our transaction record
@@ -182,7 +177,7 @@ serve(async (req) => {
       djomy_transaction_id: djomyResult.transactionId,
       payload: {
         transaction_id: transaction.id,
-        merchant_transaction_id: merchantTxId,
+        merchant_payment_reference: merchantPaymentRef,
         amount: rentAmount,
         currency,
         payment_method: djomyMethod,

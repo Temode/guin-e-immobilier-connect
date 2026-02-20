@@ -49,66 +49,64 @@ serve(async (req) => {
     }
 
     // Parse the webhook payload
+    // Djomy format: { eventType, eventId, data: { transactionId, status, paidAmount, merchantPaymentReference, ... }, metadata, timestamp }
     const payload = JSON.parse(rawBody);
-    const {
-      event,
-      transactionId: djomyTransactionId,
-      merchantTransactionId,
-      amount,
-      currency,
-      paymentMethod,
-      status: djomyStatus,
-    } = payload;
+    const eventType = payload.eventType;
+    const djomyTransactionId = payload.data?.transactionId;
+    const merchantPaymentReference = payload.data?.merchantPaymentReference;
+    const djomyStatus = payload.data?.status;
 
-    console.log(`Djomy webhook received: event=${event}, txId=${djomyTransactionId}, status=${djomyStatus}`);
+    console.log(`Djomy webhook received: eventType=${eventType}, txId=${djomyTransactionId}, merchantRef=${merchantPaymentReference}, status=${djomyStatus}`);
 
     // Log the webhook event
     await supabaseAdmin.from('webhook_events').insert({
       source: 'djomy',
-      event_type: event,
+      event_type: eventType,
       djomy_transaction_id: djomyTransactionId,
       payload,
       processed: false,
     });
 
     // Find the matching transaction
-    // Try by djomy_transaction_id in metadata first, then by payment_reference (merchantTransactionId)
+    // merchantPaymentReference is stored as payment_reference in our DB
     let transaction = null;
-    let txError = null;
 
-    // Search by merchantTransactionId (stored as payment_reference)
-    const { data: txByRef, error: err1 } = await supabaseAdmin
-      .from('transactions')
-      .select('*')
-      .eq('payment_reference', merchantTransactionId)
-      .eq('status', 'pending')
-      .single();
-
-    if (txByRef) {
-      transaction = txByRef;
-    } else {
-      // Fallback: search by djomy_transaction_id in metadata
-      const { data: txByMeta, error: err2 } = await supabaseAdmin
+    // Search by merchantPaymentReference (stored as payment_reference)
+    if (merchantPaymentReference) {
+      const { data: txByRef } = await supabaseAdmin
         .from('transactions')
         .select('*')
-        .eq('status', 'pending')
-        .contains('metadata', { djomy_transaction_id: djomyTransactionId })
-        .single();
+        .eq('payment_reference', merchantPaymentReference)
+        .in('status', ['pending', 'completed'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      transaction = txByRef;
+    }
 
+    // Fallback: search by djomy_transaction_id stored in metadata
+    if (!transaction && djomyTransactionId) {
+      const { data: txByMeta } = await supabaseAdmin
+        .from('transactions')
+        .select('*')
+        .contains('metadata', { djomy_transaction_id: djomyTransactionId })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
       transaction = txByMeta;
-      txError = err2;
     }
 
     if (!transaction) {
-      console.error(`Transaction not found: merchantTxId=${merchantTransactionId}, djomyTxId=${djomyTransactionId}`);
-      return new Response(JSON.stringify({ error: 'Transaction introuvable' }), {
-        status: 404,
+      console.error(`Transaction not found: merchantRef=${merchantPaymentReference}, djomyTxId=${djomyTransactionId}`);
+      // Return 200 anyway so Djomy doesn't keep retrying
+      return new Response(JSON.stringify({ received: true, error: 'Transaction introuvable' }), {
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Process based on event type
-    if (event === 'payment.success') {
+    // Process based on event type — Djomy field is 'eventType'
+    if (eventType === 'payment.success') {
       // Update transaction to completed
       await supabaseAdmin
         .from('transactions')
@@ -152,12 +150,12 @@ serve(async (req) => {
         .from('webhook_events')
         .update({ processed: true })
         .eq('djomy_transaction_id', djomyTransactionId)
-        .eq('event_type', event);
+        .eq('event_type', eventType);
 
       console.log(`Payment completed: tx=${transaction.id}, amount=${txAmount} ${transaction.currency}`);
-    } else if (event === 'payment.failed') {
+    } else if (eventType === 'payment.failed') {
       // Update transaction to failed
-      const failureReason = payload.failureReason || payload.error || 'Paiement refusé par le réseau mobile';
+      const failureReason = payload.data?.failureReason || payload.error || 'Paiement refusé par le réseau mobile';
       await supabaseAdmin
         .from('transactions')
         .update({
@@ -178,11 +176,11 @@ serve(async (req) => {
         .from('webhook_events')
         .update({ processed: true })
         .eq('djomy_transaction_id', djomyTransactionId)
-        .eq('event_type', event);
+        .eq('event_type', eventType);
 
       console.log(`Payment failed: tx=${transaction.id}, reason=${failureReason}`);
     } else {
-      console.log(`Unhandled event type: ${event}`);
+      console.log(`Unhandled event type: ${eventType}`);
     }
 
     // Always return 200 to Djomy so they don't retry

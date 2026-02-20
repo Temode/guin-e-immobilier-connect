@@ -83,10 +83,8 @@ export async function initiateDjomyPayment(params: {
   paymentMethod: 'OM' | 'MOMO';
   payerIdentifier: string; // phone number with country code, e.g. "00224620000000"
   amount: number;
-  currency: string;
   description: string;
-  merchantTransactionId: string;
-  callbackUrl: string;
+  merchantPaymentReference: string;
 }): Promise<{
   transactionId: string;
   status: string;
@@ -99,11 +97,9 @@ export async function initiateDjomyPayment(params: {
     paymentMethod: params.paymentMethod,
     payerIdentifier: params.payerIdentifier,
     amount: params.amount,
-    currency: params.currency,
     countryCode: 'GN',
     description: params.description,
-    merchantTransactionId: params.merchantTransactionId,
-    callbackUrl: params.callbackUrl,
+    merchantPaymentReference: params.merchantPaymentReference,
   };
 
   const res = await fetch(`${baseUrl}/v1/payments`, {
