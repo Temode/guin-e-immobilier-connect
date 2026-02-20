@@ -56,7 +56,14 @@ async function generateApiKey(): Promise<string> {
  */
 export async function getDjomyAuthToken(): Promise<string> {
   const baseUrl = getDjomyBaseUrl();
+  const clientId = getClientId();
+  const clientSecret = getClientSecret();
   const apiKey = await generateApiKey();
+
+  console.log(`[DJOMY AUTH] URL: ${baseUrl}/v1/auth`);
+  console.log(`[DJOMY AUTH] ClientId: ${clientId}`);
+  console.log(`[DJOMY AUTH] ClientSecret length: ${clientSecret.length}`);
+  console.log(`[DJOMY AUTH] X-API-KEY: ${apiKey.substring(0, 40)}...`);
 
   const res = await fetch(`${baseUrl}/v1/auth`, {
     method: 'POST',
@@ -64,18 +71,29 @@ export async function getDjomyAuthToken(): Promise<string> {
       'Content-Type': 'application/json',
       'X-API-KEY': apiKey,
     },
+    body: JSON.stringify({}),
   });
 
   const responseText = await res.text();
-  console.log(`Djomy auth response (${res.status}):`, responseText);
+  console.log(`[DJOMY AUTH] Response status: ${res.status}`);
+  console.log(`[DJOMY AUTH] Response headers:`, JSON.stringify(Object.fromEntries(res.headers.entries())));
+  console.log(`[DJOMY AUTH] Response body (full):`, responseText);
 
   if (!res.ok) {
     throw new Error(`Djomy auth failed (${res.status}): ${responseText}`);
   }
 
   const data = JSON.parse(responseText);
-  const token = data.token || data.access_token || data.accessToken;
-  console.log(`Djomy auth token extracted: ${token ? token.substring(0, 30) + '...' : 'NULL'}`);
+  console.log(`[DJOMY AUTH] Parsed keys:`, Object.keys(data));
+
+  // Djomy response: { success, data: { accessToken, tokenType, expiresIn } }
+  const token = data.data?.accessToken || data.data?.access_token || data.data?.token || data.accessToken || data.access_token || data.token;
+  console.log(`[DJOMY AUTH] Extracted token: ${token ? token.substring(0, 50) + '...' : 'NULL - NONE FOUND'}`);
+  console.log(`[DJOMY AUTH] Token type: ${data.data?.tokenType || 'unknown'}`);
+  if (!token) {
+    throw new Error(`Djomy auth: no token found in response. Keys: ${Object.keys(data).join(', ')}. Full response: ${responseText.substring(0, 500)}`);
+  }
+
   return token;
 }
 
