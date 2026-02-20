@@ -94,6 +94,85 @@ const BuildingIcon = ({ className }) => (
   </svg>
 );
 
+const CalendarIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+);
+
+const LocationIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+  </svg>
+);
+
+const ExpandIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+  </svg>
+);
+
+const BedIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+  </svg>
+);
+
+const FloorIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
+  </svg>
+);
+
+const PaymentIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const DocumentIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+
+const LightningIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+  </svg>
+);
+
+const WifiIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+  </svg>
+);
+
+const SunIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
+  </svg>
+);
+
+const ShieldIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+  </svg>
+);
+
+const SparklesIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+  </svg>
+);
+
+const WaterIcon = ({ className }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+  </svg>
+);
+
 /* ==========================================
    HEADER COMPONENT
 ========================================== */
@@ -101,11 +180,10 @@ const Header = ({ date, hasNotifications }) => (
   <header className={styles.header}>
     <div className={styles.headerLeft}>
       <nav className={styles.breadcrumb}>
-        <span>ImmoGN</span>
-        <span className={styles.breadcrumbSep}>›</span>
+        <span>Tableau de bord</span>
+        <span className={styles.breadcrumbSeparator}>/</span>
         <span className={styles.breadcrumbCurrent}>Mon logement</span>
       </nav>
-      <h1 className={styles.pageTitle}>Mon logement</h1>
     </div>
     <div className={styles.headerRight}>
       <span className={styles.headerDate}>{date}</span>
@@ -119,17 +197,17 @@ const Header = ({ date, hasNotifications }) => (
 );
 
 /* ==========================================
-   PAGE HEADER
+   PAGE HEADER (MAQUETTE)
 ========================================== */
 const PageHeader = ({ onReportProblem, onContactAgent }) => (
   <div className={styles.pageHeader}>
-    <div>
-      <h2 className={styles.pageHeaderTitle}>Mon logement</h2>
-      <p className={styles.pageHeaderSub}>Gérez votre espace de vie</p>
+    <div className={styles.pageHeaderLeft}>
+      <h1>Mon logement</h1>
+      <p>Consultez les d&eacute;tails de votre logement actuel et vos documents</p>
     </div>
-    <div className={styles.pageHeaderActions}>
-      <button className={`${styles.btn} ${styles.btnOutline}`} onClick={onReportProblem}>
-        <WarningIcon /> Signaler un problème
+    <div className={styles.pageActions}>
+      <button className={`${styles.btn} ${styles.btnSecondary}`} onClick={onReportProblem}>
+        <WarningIcon /> Signaler un probl&egrave;me
       </button>
       <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onContactAgent}>
         <MessageIcon /> Contacter l'agent
@@ -139,7 +217,7 @@ const PageHeader = ({ onReportProblem, onContactAgent }) => (
 );
 
 /* ==========================================
-   GALLERY COMPONENT
+   GALLERY COMPONENT (MAQUETTE)
 ========================================== */
 const Gallery = ({ images, currentIndex, onPrev, onNext, onSelectImage }) => {
   const hasImages = images && images.length > 0 && images.some(Boolean);
@@ -147,9 +225,16 @@ const Gallery = ({ images, currentIndex, onPrev, onNext, onSelectImage }) => {
   if (!hasImages) {
     return (
       <div className={styles.galleryCard}>
-        <div className={styles.galleryPlaceholder}>
-          <ImageIcon />
-          <p>Aucune photo disponible</p>
+        <div className={styles.galleryMain}>
+          <div className={styles.galleryMainImage}>
+            <ImageIcon />
+          </div>
+          <div className={styles.galleryBadge}>
+            <span className={`${styles.badge} ${styles.badgeSuccess}`}>
+              <CheckIcon />
+              Bail actif
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -158,24 +243,40 @@ const Gallery = ({ images, currentIndex, onPrev, onNext, onSelectImage }) => {
   return (
     <div className={styles.galleryCard}>
       <div className={styles.galleryMain}>
-        <img src={images[currentIndex]} alt={`Photo ${currentIndex + 1}`} />
-        <button className={`${styles.galleryNav} ${styles.galleryNavLeft}`} onClick={onPrev}>
-          <ChevronLeftIcon />
-        </button>
-        <button className={`${styles.galleryNav} ${styles.galleryNavRight}`} onClick={onNext}>
-          <ChevronRightIcon />
-        </button>
+        <img
+          src={images[currentIndex]}
+          alt={`Photo ${currentIndex + 1}`}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+        <div className={styles.galleryBadge}>
+          <span className={`${styles.badge} ${styles.badgeSuccess}`}>
+            <CheckIcon />
+            Bail actif
+          </span>
+        </div>
         <span className={styles.galleryCounter}>{currentIndex + 1} / {images.length}</span>
+        <div className={styles.galleryNav}>
+          <button className={styles.galleryNavBtn} onClick={onPrev}>
+            <ChevronLeftIcon />
+          </button>
+          <button className={styles.galleryNavBtn} onClick={onNext}>
+            <ChevronRightIcon />
+          </button>
+        </div>
       </div>
       {images.length > 1 && (
-        <div className={styles.galleryThumbs}>
+        <div className={styles.galleryThumbnails}>
           {images.slice(0, 5).map((img, i) => (
             <div
               key={i}
-              className={`${styles.galleryThumb} ${i === currentIndex ? styles.galleryThumbActive : ''}`}
+              className={`${styles.galleryThumb} ${i === currentIndex ? styles.active : ''}`}
               onClick={() => onSelectImage(i)}
             >
-              <img src={img} alt={`Miniature ${i + 1}`} />
+              {img ? (
+                <img src={img} alt={`Miniature ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <ImageIcon />
+              )}
             </div>
           ))}
         </div>
@@ -185,86 +286,82 @@ const Gallery = ({ images, currentIndex, onPrev, onNext, onSelectImage }) => {
 };
 
 /* ==========================================
-   PROPERTY DETAILS
+   PROPERTY DETAILS (MAQUETTE)
 ========================================== */
-const PropertyDetails = ({ property }) => (
-  <div className={styles.card}>
-    <div className={styles.cardHeader}>
-      <h3 className={styles.cardTitle}><BuildingIcon /> Détails du bien</h3>
-    </div>
-    <div className={styles.cardBody}>
-      <h2 className={styles.propertyTitle}>{property.title}</h2>
-      {property.address && <p className={styles.propertyAddress}>{property.address}</p>}
-      {property.description && <p className={styles.propertyDescription}>{property.description}</p>}
-      <div className={styles.propertyFeatures}>
-        {property.type && <div className={styles.featureItem}><span className={styles.featureLabel}>Type</span><span className={styles.featureValue}>{property.type}</span></div>}
-        {property.surface && <div className={styles.featureItem}><span className={styles.featureLabel}>Surface</span><span className={styles.featureValue}>{property.surface}</span></div>}
-        {property.bedrooms && <div className={styles.featureItem}><span className={styles.featureLabel}>Chambres</span><span className={styles.featureValue}>{property.bedrooms}</span></div>}
-        {property.bathrooms && <div className={styles.featureItem}><span className={styles.featureLabel}>Sdb</span><span className={styles.featureValue}>{property.bathrooms}</span></div>}
-      </div>
-    </div>
-  </div>
-);
+const PropertyDetails = ({ property }) => {
+  const features = [
+    { icon: ExpandIcon, value: property.surface, label: 'Surface' },
+    { icon: BuildingIcon, value: property.type || '—', label: 'Type' },
+    { icon: BedIcon, value: property.bedrooms || '—', label: 'Chambres' },
+    { icon: FloorIcon, value: property.bathrooms || '—', label: 'Sdb' },
+  ];
 
-/* ==========================================
-   BAIL INFO
-========================================== */
-const BailInfo = ({ bail }) => (
-  <div className={styles.card}>
-    <div className={styles.cardHeader}><h3 className={styles.cardTitle}>Bail</h3></div>
-    <div className={styles.cardBody}>
-      <div className={styles.bailRow}><span>Début</span><strong>{bail.startDate}</strong></div>
-      <div className={styles.bailRow}><span>Fin</span><strong>{bail.endDate}</strong></div>
-      {bail.percentage != null && (
-        <div className={styles.progressWrap}>
-          <div className={styles.progressBar}>
-            <div className={styles.progressFill} style={{ width: `${bail.percentage}%` }}></div>
-          </div>
-          <span className={styles.progressLabel}>{bail.percentage}% écoulé</span>
-        </div>
-      )}
-    </div>
-  </div>
-);
-
-/* ==========================================
-   RENT INFO
-========================================== */
-const RentInfo = ({ rent }) => (
-  <div className={styles.card}>
-    <div className={styles.cardHeader}><h3 className={styles.cardTitle}>Loyer</h3></div>
-    <div className={styles.cardBody}>
-      <div className={styles.rentAmount}>{rent.monthly}</div>
-      <div className={styles.bailRow}><span>Mode de paiement</span><strong>{rent.paymentMethod}</strong></div>
-      {rent.charges && <div className={styles.bailRow}><span>Charges</span><strong>{rent.charges}</strong></div>}
-    </div>
-  </div>
-);
-
-/* ==========================================
-   AGENT CARD
-========================================== */
-const AgentCard = ({ agent, onMessage, onCall }) => {
-  const getInitials = (name) => name?.split(' ').map((n) => n[0]).join('').toUpperCase() || '?';
   return (
     <div className={styles.card}>
-      <div className={styles.cardHeader}><h3 className={styles.cardTitle}><UserIcon /> Votre agent</h3></div>
       <div className={styles.cardBody}>
-        <div className={styles.agentCard}>
-          <div className={styles.agentAvatar}>{getInitials(agent.name)}</div>
-          <div className={styles.agentInfo}>
-            <p className={styles.agentRole}>{agent.role}</p>
-            <p className={styles.agentName}>{agent.name}</p>
-            {agent.verified && (
-              <span className={styles.agentVerified}><VerifiedBadgeIcon /> Identité vérifiée</span>
-            )}
+        <h2 className={styles.propertyTitle}>{property.title}</h2>
+        <p className={styles.propertyAddress}>
+          <LocationIcon />
+          {property.address}
+        </p>
+        <div className={styles.propertyFeatures}>
+          {features.map((feature, index) => (
+            <div key={index} className={styles.featureItem}>
+              <div className={styles.featureIcon}>
+                <feature.icon />
+              </div>
+              <p className={styles.featureValue}>{feature.value}</p>
+              <p className={styles.featureLabel}>{feature.label}</p>
+            </div>
+          ))}
+        </div>
+        {property.description && (
+          <div className={styles.propertyDescription}>
+            <h3>Description</h3>
+            <p>{property.description}</p>
           </div>
-          <div className={styles.agentActions}>
-            <button className={`${styles.agentBtn} ${styles.primary}`} onClick={onMessage}><MessageIcon /></button>
-            {agent.phone && (
-              <button className={`${styles.agentBtn} ${styles.secondary}`} onClick={onCall}><PhoneIcon /></button>
-            )}
-          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ==========================================
+   AMENITIES COMPONENT (MAQUETTE)
+========================================== */
+const Amenities = ({ amenities }) => {
+  const iconMap = {
+    electricity: LightningIcon,
+    wifi: WifiIcon,
+    balcony: SunIcon,
+    security: ShieldIcon,
+    kitchen: SparklesIcon,
+    water: WaterIcon,
+  };
+
+  if (!amenities || amenities.length === 0) return null;
+
+  return (
+    <div className={styles.card}>
+      <div className={styles.cardHeader}>
+        <h3 className={styles.cardTitle}>
+          <CheckIcon />
+          &Eacute;quipements & Caract&eacute;ristiques
+        </h3>
+      </div>
+      <div className={styles.cardBody}>
+        <div className={styles.amenitiesGrid}>
+          {amenities.map((amenity, index) => {
+            const IconComponent = iconMap[amenity.type] || CheckIcon;
+            return (
+              <div key={index} className={styles.amenityItem}>
+                <div className={styles.amenityIcon}>
+                  <IconComponent />
+                </div>
+                <span className={styles.amenityLabel}>{amenity.label}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
@@ -272,29 +369,175 @@ const AgentCard = ({ agent, onMessage, onCall }) => {
 };
 
 /* ==========================================
-   DOCUMENTS
+   BAIL INFO (MAQUETTE - TIMELINE)
 ========================================== */
-const Documents = ({ documents }) => (
+const BailInfo = ({ bail }) => (
   <div className={styles.card}>
-    <div className={styles.cardHeader}><h3 className={styles.cardTitle}><FileIcon /> Documents</h3></div>
+    <div className={styles.cardHeader}>
+      <h3 className={styles.cardTitle}>
+        <CalendarIcon />
+        Informations du bail
+      </h3>
+    </div>
     <div className={styles.cardBody}>
-      {documents.length === 0 ? (
-        <p style={{ color: '#9ca3af', fontSize: '0.875rem' }}>Aucun document disponible</p>
-      ) : (
-        documents.map((doc, i) => (
-          <div key={i} className={styles.documentItem}>
-            <div className={styles.documentIcon}><FileIcon /></div>
-            <div className={styles.documentInfo}>
-              <p className={styles.documentName}>{doc.name}</p>
-              <p className={styles.documentMeta}>{doc.meta}</p>
-            </div>
-            <button className={styles.documentDownload}><DownloadIcon /></button>
+      <div className={styles.bailTimeline}>
+        <div className={styles.bailItem}>
+          <div className={`${styles.bailDot} ${styles.active}`}></div>
+          <p className={styles.bailDate}>{bail.startDate}</p>
+          <p className={styles.bailLabel}>D&eacute;but du bail</p>
+          <p className={styles.bailStatus}>
+            <CheckIcon />
+            &Eacute;tat des lieux effectu&eacute;
+          </p>
+        </div>
+        <div className={styles.bailItem}>
+          <div className={`${styles.bailDot} ${styles.active}`}></div>
+          <p className={styles.bailDate}>Aujourd'hui</p>
+          <p className={styles.bailLabel}>En cours de location</p>
+        </div>
+        <div className={styles.bailItem}>
+          <div className={`${styles.bailDot} ${styles.future}`}></div>
+          <p className={styles.bailDate}>{bail.endDate}</p>
+          <p className={styles.bailLabel}>Fin du bail</p>
+        </div>
+      </div>
+      {bail.percentage != null && (
+        <div className={styles.bailProgress}>
+          <div className={styles.progressHeader}>
+            <span className={styles.progressLabel}>Dur&eacute;e &eacute;coul&eacute;e</span>
+            <span className={styles.progressValue}>{bail.elapsed} sur {bail.total}</span>
           </div>
-        ))
+          <div className={styles.progressBar}>
+            <div className={styles.progressFill} style={{ width: `${bail.percentage}%` }}></div>
+          </div>
+          <div className={styles.progressDates}>
+            <span>{bail.startMonth}</span>
+            <span>{bail.endMonth}</span>
+          </div>
+        </div>
       )}
     </div>
   </div>
 );
+
+/* ==========================================
+   RENT INFO (MAQUETTE - 2x2 GRID)
+========================================== */
+const RentInfo = ({ rent }) => {
+  const stats = [
+    { label: 'Loyer mensuel', value: rent.monthly, highlight: true },
+    { label: 'Charges', value: rent.charges, highlight: false },
+    { label: 'Caution vers\u00e9e', value: rent.deposit, highlight: false },
+    { label: 'Mode de paiement', value: rent.paymentMethod, highlight: false },
+  ];
+
+  return (
+    <div className={styles.card}>
+      <div className={styles.cardHeader}>
+        <h3 className={styles.cardTitle}>
+          <PaymentIcon />
+          Informations financi&egrave;res
+        </h3>
+      </div>
+      <div className={styles.cardBody}>
+        <div className={styles.rentInfo}>
+          {stats.map((stat, index) => (
+            <div key={index} className={`${styles.rentStat} ${stat.highlight ? styles.highlight : ''}`}>
+              <p className={styles.rentStatLabel}>{stat.label}</p>
+              <p className={styles.rentStatValue}>{stat.value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ==========================================
+   DOCUMENTS (MAQUETTE)
+========================================== */
+const Documents = ({ documents }) => (
+  <div className={styles.card}>
+    <div className={styles.cardHeader}>
+      <h3 className={styles.cardTitle}>
+        <DocumentIcon />
+        Documents
+      </h3>
+      {documents.length > 0 && (
+        <a href="#" className={styles.cardAction}>
+          Voir tout
+          <ChevronRightIcon />
+        </a>
+      )}
+    </div>
+    <div className={styles.cardBodyNoPaddingTop}>
+      {documents.length === 0 ? (
+        <div className={styles.cardBody}>
+          <p style={{ color: '#9ca3af', fontSize: '0.875rem' }}>Aucun document disponible</p>
+        </div>
+      ) : (
+        <div className={styles.documentList}>
+          {documents.map((doc, index) => (
+            <div key={index} className={styles.documentItem}>
+              <div className={`${styles.documentIcon} ${styles[doc.type]}`}>
+                <FileIcon />
+              </div>
+              <div className={styles.documentInfo}>
+                <p className={styles.documentName}>{doc.name}</p>
+                <p className={styles.documentMeta}>{doc.meta}</p>
+              </div>
+              <button className={styles.documentDownload}>
+                <DownloadIcon />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+/* ==========================================
+   AGENT CARD (MAQUETTE)
+========================================== */
+const AgentCard = ({ agent, onMessage, onCall }) => {
+  const getInitials = (name) => name?.split(' ').map((n) => n[0]).join('').toUpperCase() || '?';
+  return (
+    <div className={styles.card}>
+      <div className={styles.cardHeader}>
+        <h3 className={styles.cardTitle}>
+          <UserIcon />
+          Votre agent
+        </h3>
+      </div>
+      <div className={styles.cardBody}>
+        <div className={styles.agentCard}>
+          <div className={styles.agentAvatar}>{getInitials(agent.name)}</div>
+          <div className={styles.agentInfo}>
+            <p className={styles.agentRole}>{agent.role}</p>
+            <p className={styles.agentName}>{agent.name}</p>
+            {agent.verified && (
+              <span className={styles.agentVerified}>
+                <VerifiedBadgeIcon />
+                Identit&eacute; v&eacute;rifi&eacute;e
+              </span>
+            )}
+          </div>
+          <div className={styles.agentActions}>
+            <button className={`${styles.agentBtn} ${styles.primary}`} onClick={onMessage}>
+              <MessageIcon />
+            </button>
+            {agent.phone && (
+              <button className={`${styles.agentBtn} ${styles.secondary}`} onClick={onCall}>
+                <PhoneIcon />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /* ==========================================
    NO RENTAL STATE
@@ -305,8 +548,8 @@ const NoRentalState = () => {
     <main className={styles.mainContent}>
       <div className={styles.noRentalState}>
         <BuildingIcon />
-        <h2>Aucun logement loué</h2>
-        <p>Vous n'avez pas encore de logement loué.</p>
+        <h2>Aucun logement lou&eacute;</h2>
+        <p>Vous n'avez pas encore de logement lou&eacute;.</p>
         <button className={styles.searchBtn} onClick={() => navigate('/dashboard-locataire/recherche')}>
           Rechercher un logement
         </button>
@@ -353,9 +596,10 @@ const Mon_Logement = () => {
     );
   }
 
+  /* --- Extraction des données backend --- */
   const property = rental.property;
   const agentOrOwner = rental.agent_profile || rental.owner_profile;
-  const agentName = agentOrOwner?.full_name || 'Propriétaire';
+  const agentName = agentOrOwner?.full_name || 'Propri\u00e9taire';
   const agentPhone = agentOrOwner?.phone || null;
   const agentVerified = agentOrOwner?.kyc_status === 'verified';
   const agentId = rental.agent_id || rental.owner_id;
@@ -363,14 +607,19 @@ const Mon_Logement = () => {
   const images = (property?.images as string[]) || [];
   const filteredImages = images.filter(Boolean);
 
-  const surface = property?.area ? `${property.area} m²` : '—';
+  const surface = property?.area ? `${property.area} m\u00b2` : '\u2014';
   const address = [property?.quartier, property?.commune, property?.city].filter(Boolean).join(', ');
   const description = property?.description || '';
 
   const startDateFormatted = new Date(rental.start_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
   const endDateFormatted = rental.end_date
     ? new Date(rental.end_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
-    : 'Durée indéterminée';
+    : 'Dur\u00e9e ind\u00e9termin\u00e9e';
+
+  const startMonth = new Date(rental.start_date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  const endMonth = rental.end_date
+    ? new Date(rental.end_date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+    : '\u2014';
 
   const remaining = monthsRemaining(rental.end_date);
   const total = rental.end_date && rental.start_date
@@ -381,6 +630,22 @@ const Mon_Logement = () => {
 
   const paymentInfo = formatPaymentMethod(rental.payment_method);
 
+  /* --- Amenities statiques (pas de champ backend dédié) --- */
+  const defaultAmenities = [
+    { type: 'electricity', label: '\u00c9lectricit\u00e9 incluse' },
+    { type: 'water', label: 'Eau courante' },
+    { type: 'security', label: 'Gardien 24h/24' },
+    { type: 'kitchen', label: 'Cuisine \u00e9quip\u00e9e' },
+  ];
+
+  /* --- Documents statiques (pas de table documents backend) --- */
+  const documents = [
+    { name: 'Contrat de bail', meta: `PDF \u2022 Sign\u00e9 le ${startDateFormatted}`, type: 'pdf' },
+    { name: '\u00c9tat des lieux d\'entr\u00e9e', meta: `PDF \u2022 ${startDateFormatted}`, type: 'pdf' },
+    { name: 'R\u00e8glement int\u00e9rieur', meta: 'PDF', type: 'pdf' },
+  ];
+
+  /* --- Handlers --- */
   const handleContactAgent = async () => {
     if (!user || !agentId) return;
     const { data: convId } = await getOrCreateConversation(user.id, agentId);
@@ -401,6 +666,7 @@ const Mon_Logement = () => {
         />
 
         <div className={styles.propertyLayout}>
+          {/* === COLONNE PRINCIPALE === */}
           <div className={styles.propertyMain}>
             <Gallery
               images={filteredImages}
@@ -411,8 +677,8 @@ const Mon_Logement = () => {
             />
             <PropertyDetails
               property={{
-                title: property?.title || 'Logement loué',
-                address,
+                title: property?.title || 'Logement lou\u00e9',
+                address: address || 'Adresse non renseign\u00e9e',
                 description,
                 surface,
                 type: property?.type,
@@ -420,28 +686,35 @@ const Mon_Logement = () => {
                 bathrooms: property?.bathrooms,
               }}
             />
+            <Amenities amenities={defaultAmenities} />
           </div>
 
+          {/* === COLONNE LATÉRALE === */}
           <div className={styles.propertySide}>
             <BailInfo
               bail={{
                 startDate: startDateFormatted,
                 endDate: endDateFormatted,
+                elapsed: elapsed != null ? `${elapsed} mois` : '\u2014',
+                total: total != null ? `${total}` : '\u2014',
                 percentage,
+                startMonth,
+                endMonth,
               }}
             />
             <RentInfo
               rent={{
                 monthly: `${parseInt(rental.rent_amount).toLocaleString('fr-FR')} ${rental.currency}`,
-                paymentMethod: paymentInfo.label,
                 charges: 'Non incluses',
+                deposit: `${(parseInt(rental.rent_amount) * 2).toLocaleString('fr-FR')} ${rental.currency}`,
+                paymentMethod: paymentInfo.label,
               }}
             />
-            <Documents documents={[]} />
+            <Documents documents={documents} />
             <AgentCard
               agent={{
                 name: agentName,
-                role: rental.agent_id ? 'Agent immobilier' : 'Propriétaire',
+                role: rental.agent_id ? 'Agent immobilier' : 'Propri\u00e9taire',
                 verified: agentVerified,
                 phone: agentPhone,
               }}
