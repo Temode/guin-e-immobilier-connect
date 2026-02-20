@@ -190,10 +190,11 @@ serve(async (req) => {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Erreur interne';
     console.error('djomy-webhook error:', error);
     // Still return 200 to prevent retries; we've logged the event
-    return new Response(JSON.stringify({ received: true, error: error.message }), {
+    return new Response(JSON.stringify({ received: true, error: message }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
