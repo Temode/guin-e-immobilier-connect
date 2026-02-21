@@ -31,8 +31,7 @@ serve(async (req) => {
     const rawBody = await req.text();
     const signatureHeader = req.headers.get('X-Webhook-Signature') || req.headers.get('x-webhook-signature') || '';
 
-    console.log(`[WEBHOOK] Signature header received: "${signatureHeader.substring(0, 60)}..."`);
-    console.log(`[WEBHOOK] All headers:`, JSON.stringify(Object.fromEntries(req.headers.entries())));
+    // Validate signature (skip in sandbox — Djomy sandbox may not sign correctly)
 
     // Validate signature (skip in sandbox if no valid signature — Djomy sandbox may not sign)
     const djomyEnv = Deno.env.get('DJOMY_ENV') || 'sandbox';
