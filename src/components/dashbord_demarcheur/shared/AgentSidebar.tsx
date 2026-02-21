@@ -11,6 +11,7 @@ import {
   SettingsIcon,
   StarIcon,
   SparklesIcon,
+  BotIcon,
 } from './AgentSidebarIcons';
 import styles from './DashboardAgentLayout.module.css';
 import { useAuthContext } from '@/context/AuthContext';
@@ -45,6 +46,7 @@ const navSections: NavSection[] = [
     title: 'Communication',
     items: [
       { icon: MessageIcon, label: 'Messages', to: '/dashbord-agent/messages', badge: 0, badgeUrgent: true },
+      { icon: BotIcon, label: 'IA Assistant · ARIA', to: '/dashbord-agent/ia-chat' },
     ],
   },
   {
