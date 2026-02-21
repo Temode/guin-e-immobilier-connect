@@ -182,13 +182,22 @@ export async function validateWebhookSignature(
   payload: string,
   signatureHeader: string,
 ): Promise<boolean> {
-  if (!signatureHeader || !signatureHeader.startsWith('v1:')) {
+  if (!signatureHeader) {
+    console.warn('[WEBHOOK] No signature header received');
     return false;
   }
 
-  const receivedSignature = signatureHeader.slice(3); // Remove "v1:" prefix
+  // Support both "v1:<sig>" and raw "<sig>" formats
+  const receivedSignature = signatureHeader.startsWith('v1:')
+    ? signatureHeader.slice(3)
+    : signatureHeader;
+
   const clientSecret = getClientSecret();
   const expectedSignature = await hmacSha256(payload, clientSecret);
+
+  console.log(`[WEBHOOK] Received sig: ${receivedSignature.substring(0, 20)}...`);
+  console.log(`[WEBHOOK] Expected sig: ${expectedSignature.substring(0, 20)}...`);
+  console.log(`[WEBHOOK] Match: ${receivedSignature === expectedSignature}`);
 
   return receivedSignature === expectedSignature;
 }
