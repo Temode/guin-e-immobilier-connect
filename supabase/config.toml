@@ -8,3 +8,15 @@ verify_jwt = false
 
 [functions.djomy-webhook]
 verify_jwt = false
+
+[functions.ai-agent-chat]
+verify_jwt = true
+
+[functions.ai-smart-relance]
+verify_jwt = true
+
+[functions.ai-analyze-conversation]
+verify_jwt = true
+
+[functions.ai-daily-report]
+verify_jwt = true

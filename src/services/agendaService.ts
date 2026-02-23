@@ -76,9 +76,12 @@ export async function getAgentVisits(options?: {
   }
 
   const { data, error } = await query;
-  if (error || !data) return { data: [], error };
+  if (error) {
+    console.warn('[Agenda] Erreur getAgentVisits:', error.message);
+    return { data: [], error: null };
+  }
 
-  return { data: data as Visit[], error: null };
+  return { data: (data || []) as Visit[], error: null };
 }
 
 /**
@@ -100,12 +103,13 @@ export async function getVisitStats(agentId: string): Promise<{
   weekEnd.setDate(weekStart.getDate() + 6);
   weekEnd.setHours(23, 59, 59, 999);
 
-  const { data: all } = await supabase
+  const { data: all, error } = await supabase
     .from('visits')
     .select('scheduled_at, status, type')
     .eq('agent_id', agentId)
     .neq('status', 'cancelled');
 
+  if (error) console.warn('[Agenda] Erreur getVisitStats:', error.message);
   const visits = all || [];
   const today = visits.filter(v => {
     const d = new Date(v.scheduled_at);
