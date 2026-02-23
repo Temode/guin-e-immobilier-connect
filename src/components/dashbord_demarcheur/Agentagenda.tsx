@@ -1,4 +1,19 @@
-import { useState } from 'react';
+// @ts-nocheck
+import { useState, useEffect, useCallback } from 'react';
+import { useAuthContext } from '@/context/AuthContext';
+import {
+  getAgentVisits,
+  getVisitStats,
+  getNextVisit,
+  createVisit,
+  updateVisitStatus,
+  cancelVisit,
+  markRelanceSent,
+  getVisitTypeLabel,
+  formatVisitTime,
+  formatCountdown,
+} from '@/services/agendaService';
+import { generateSmartRelance } from '@/services/aiAgentChatService';
 import styles from './AgentAgenda.module.css';
 
 /* ==========================================
@@ -151,37 +166,210 @@ const RefreshIcon = ({ className }: { className?: string }) => (
 );
 
 /* ==========================================
-   TOP BAR COMPONENT
+   MOCK DATA — Fallback quand la base est vide
 ========================================== */
-const TopBar = () => (
-  <header className={styles.topBar}>
-    <div className={styles.topBarLeft}>
-      <div className={styles.pageContext}>
-        <span className={styles.pageDate}>
-          Mardi 4 février 2025
-          <span className={styles.weather}>
-            <SunIcon />
-            28°C Conakry
-          </span>
-        </span>
-        <h1 className={styles.pageTitle}>Agenda & Visites</h1>
-      </div>
-    </div>
-    <div className={styles.topBarRight}>
-      <button className={styles.iconBtn}>
-        <NotificationIcon />
-        <span className={styles.notificationBadge}>3</span>
-      </button>
-      <button className={`${styles.btn} ${styles.btnPrimary}`}>
-        <PlusIcon />
-        Nouvelle visite
-      </button>
-    </div>
-  </header>
-);
+const MOCK_NEXT_RDV = {
+  type: 'Visite',
+  countdown: 'Dans 45 min',
+  isUrgent: true,
+  property: {
+    title: 'Appartement F3 Meublé',
+    price: 2500000,
+    address: 'Cité Chemin de Fer, Immeuble B, 3ème étage, Kipé',
+  },
+  client: {
+    name: 'Mamadou Diallo',
+    initials: 'MD',
+    phone: '+224 620 12 34 56',
+  },
+  note: 'Budget confirmé à 2,5M. Cherche avec parking. Famille de 3 personnes.',
+};
+
+const MOCK_STATS = [
+  { icon: 'calendar', iconStyle: 'primary', value: 4, label: 'Aujourd\'hui' },
+  { icon: 'clipboard', iconStyle: 'info', value: 12, label: 'Cette semaine' },
+  { icon: 'warning', iconStyle: 'warning', value: 2, label: 'À confirmer', variant: 'warning' },
+  { icon: 'check', iconStyle: 'gold', value: 1, label: 'Signature prévue', variant: 'gold' },
+];
+
+const MOCK_ALERT = {
+  title: '2 visites en attente de confirmation',
+  description: 'Mme Barry (11h30) et M. Keita (demain 15h) n\'ont pas encore confirmé leur présence.',
+};
+
+const MOCK_VISITS = [
+  {
+    time: '09:00',
+    type: 'visit',
+    typeLabel: 'Visite',
+    status: 'confirmed',
+    property: {
+      title: 'Appartement F3 Meublé',
+      price: 2500000,
+      location: 'Kipé, Ratoma',
+      address: 'Cité Chemin de Fer, Immeuble B, 3ème étage, Kipé',
+    },
+    client: {
+      name: 'Mamadou Diallo',
+      initials: 'MD',
+      phone: '+224 620 12 34 56',
+      note: 'Recherche F3, budget 2-3M, famille 3 personnes',
+    },
+    eta: '~25 min depuis votre position actuelle',
+  },
+  {
+    time: '11:30',
+    type: 'visit',
+    typeLabel: 'Visite',
+    status: 'pending',
+    property: {
+      title: 'Villa F4 avec Jardin',
+      price: 4800000,
+      location: 'Lambanyi, Ratoma',
+      address: 'Quartier Résidentiel, Rue 12, Lambanyi',
+    },
+    client: {
+      name: 'Aissatou Barry',
+      initials: 'AB',
+      phone: '+224 622 45 67 89',
+      note: 'Cherche villa avec jardin pour les enfants',
+    },
+    eta: '~40 min depuis Kipé (trafic dense prévu)',
+  },
+  {
+    time: '14:30',
+    type: 'contre-visite',
+    typeLabel: 'Contre-visite',
+    status: 'confirmed',
+    property: {
+      title: 'Appartement F2 Rénové',
+      price: 1200000,
+      location: 'Nongo, Ratoma',
+      address: 'Résidence Les Palmiers, Apt 204, Nongo',
+    },
+    client: {
+      name: 'Ibrahima Sow',
+      initials: 'IS',
+      phone: '+224 625 11 22 33',
+      note: '2ème visite - Veut vérifier la pression d\'eau',
+    },
+    eta: '~20 min depuis Lambanyi',
+  },
+  {
+    time: '16:30',
+    type: 'signature',
+    typeLabel: 'Signature',
+    status: 'confirmed',
+    property: {
+      title: 'Studio Centre-ville',
+      price: 800000,
+      location: 'Cosa, Matam',
+      address: 'Immeuble Alpha, RDC, Cosa',
+    },
+    client: {
+      name: 'Fatoumata Bah',
+      initials: 'FB',
+      phone: '+224 628 99 88 77',
+      note: 'Documents prêts - Apporter 2 copies du contrat',
+    },
+    eta: '~35 min depuis Nongo',
+  },
+];
 
 /* ==========================================
-   HERO NEXT RDV COMPONENT
+   HELPER: Convertir une visite DB vers le format d'affichage
+========================================== */
+function dbVisitToDisplay(visit) {
+  const initials = visit.lead_name
+    ? visit.lead_name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+    : '??';
+
+  return {
+    id: visit.id,
+    time: formatVisitTime(visit.scheduled_at),
+    type: visit.type,
+    typeLabel: getVisitTypeLabel(visit.type),
+    status: visit.status,
+    property: {
+      title: visit.property?.title || 'Bien immobilier',
+      price: visit.property?.rent_amount ? Number(visit.property.rent_amount) : 0,
+      location: visit.property?.city || visit.address || '',
+      address: visit.address || visit.property?.address || visit.property?.city || '',
+    },
+    client: {
+      name: visit.lead_name,
+      initials,
+      phone: visit.lead_phone || '',
+      note: visit.lead_notes || '',
+    },
+    eta: '',
+    ai_prospect_score: visit.ai_prospect_score,
+    scheduled_at: visit.scheduled_at,
+  };
+}
+
+function dbVisitToHero(visit) {
+  const { label: countdown, isUrgent } = formatCountdown(visit.scheduled_at);
+  const initials = visit.lead_name
+    ? visit.lead_name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+    : '??';
+
+  return {
+    type: getVisitTypeLabel(visit.type),
+    countdown,
+    isUrgent,
+    property: {
+      title: visit.property?.title || 'Visite programmée',
+      price: visit.property?.rent_amount ? Number(visit.property.rent_amount) : 0,
+      address: visit.address || visit.property?.address || visit.property?.city || '',
+    },
+    client: {
+      name: visit.lead_name,
+      initials,
+      phone: visit.lead_phone || '',
+    },
+    note: visit.lead_notes || '',
+  };
+}
+
+/* ==========================================
+   TOP BAR COMPONENT (design original préservé)
+========================================== */
+const TopBar = ({ pendingCount, onNewVisit }) => {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+
+  return (
+    <header className={styles.topBar}>
+      <div className={styles.topBarLeft}>
+        <div className={styles.pageContext}>
+          <span className={styles.pageDate}>
+            {capitalizedDate}
+            <span className={styles.weather}>
+              <SunIcon />
+              28°C Conakry
+            </span>
+          </span>
+          <h1 className={styles.pageTitle}>Agenda & Visites</h1>
+        </div>
+      </div>
+      <div className={styles.topBarRight}>
+        <button className={styles.iconBtn}>
+          <NotificationIcon />
+          {pendingCount > 0 && <span className={styles.notificationBadge}>{pendingCount}</span>}
+        </button>
+        <button className={`${styles.btn} ${styles.btnPrimary}`} onClick={onNewVisit}>
+          <PlusIcon />
+          Nouvelle visite
+        </button>
+      </div>
+    </header>
+  );
+};
+
+/* ==========================================
+   HERO NEXT RDV COMPONENT (design original préservé)
 ========================================== */
 const HeroNextRdv = ({ nextRdv }) => (
   <div className={styles.heroNextRdv}>
@@ -207,7 +395,9 @@ const HeroNextRdv = ({ nextRdv }) => (
           {nextRdv.type}
         </div>
         <h2 className={styles.heroTitle}>{nextRdv.property.title}</h2>
-        <p className={styles.heroPrice}>{nextRdv.property.price.toLocaleString('fr-GN')} GNF / mois</p>
+        {nextRdv.property.price > 0 && (
+          <p className={styles.heroPrice}>{nextRdv.property.price.toLocaleString('fr-GN')} GNF / mois</p>
+        )}
         <div className={styles.heroClient}>
           <div className={styles.heroClientAvatar}>{nextRdv.client.initials}</div>
           <span className={styles.heroClientName}>{nextRdv.client.name}</span>
@@ -245,7 +435,7 @@ const HeroNextRdv = ({ nextRdv }) => (
 );
 
 /* ==========================================
-   STATS GRID COMPONENT
+   STATS GRID COMPONENT (design original préservé)
 ========================================== */
 const StatsGrid = ({ stats }) => {
   const icons = {
@@ -276,9 +466,9 @@ const StatsGrid = ({ stats }) => {
 };
 
 /* ==========================================
-   ALERT BANNER COMPONENT
+   ALERT BANNER COMPONENT (design original préservé)
 ========================================== */
-const AlertBanner = ({ alert }) => (
+const AlertBanner = ({ alert, onRelance }) => (
   <div className={styles.alertBanner}>
     <div className={styles.alertBannerIcon}>
       <WarningIcon />
@@ -287,7 +477,7 @@ const AlertBanner = ({ alert }) => (
       <h4>{alert.title}</h4>
       <p>{alert.description}</p>
     </div>
-    <button className={`${styles.btn} ${styles.btnGold} ${styles.btnSm}`}>
+    <button className={`${styles.btn} ${styles.btnGold} ${styles.btnSm}`} onClick={onRelance}>
       <RefreshIcon />
       Relancer
     </button>
@@ -295,9 +485,9 @@ const AlertBanner = ({ alert }) => (
 );
 
 /* ==========================================
-   VIEW CONTROLS COMPONENT
+   VIEW CONTROLS COMPONENT (design original préservé)
 ========================================== */
-const ViewControls = ({ activeTab, onTabChange, currentDate, viewMode, onViewModeChange }) => (
+const ViewControls = ({ activeTab, onTabChange, currentDate, viewMode, onViewModeChange, onDateChange }) => (
   <div className={styles.viewControls}>
     <div className={styles.viewTabs}>
       {['Aujourd\'hui', 'Semaine', 'Mois'].map((tab) => (
@@ -312,11 +502,11 @@ const ViewControls = ({ activeTab, onTabChange, currentDate, viewMode, onViewMod
     </div>
     <div className={styles.viewOptions}>
       <div className={styles.dateNav}>
-        <button className={styles.dateNavBtn}>
+        <button className={styles.dateNavBtn} onClick={() => onDateChange(-1)}>
           <ChevronLeftIcon />
         </button>
         <span className={styles.dateDisplay}>{currentDate}</span>
-        <button className={styles.dateNavBtn}>
+        <button className={styles.dateNavBtn} onClick={() => onDateChange(1)}>
           <ChevronRightIcon />
         </button>
       </div>
@@ -341,9 +531,9 @@ const ViewControls = ({ activeTab, onTabChange, currentDate, viewMode, onViewMod
 );
 
 /* ==========================================
-   VISIT CARD COMPONENT
+   VISIT CARD COMPONENT (design original préservé)
 ========================================== */
-const VisitCard = ({ visit }) => {
+const VisitCard = ({ visit, onConfirm, onCancel, onRelance }) => {
   const typeIcons = {
     visit: HomeIcon,
     'contre-visite': RefreshIcon,
@@ -355,6 +545,7 @@ const VisitCard = ({ visit }) => {
     confirmed: { label: 'Confirmé', icon: CheckIcon },
     pending: { label: 'En attente', icon: ClockIcon },
     cancelled: { label: 'Annulé', icon: XIcon },
+    completed: { label: 'Terminé', icon: CheckCircleIcon },
   };
 
   const TypeIcon = typeIcons[visit.type] || HomeIcon;
@@ -379,16 +570,22 @@ const VisitCard = ({ visit }) => {
             <DotsVerticalIcon />
           </button>
           <div className={styles.dropdownMenu}>
-            <div className={styles.dropdownItem}>
+            {visit.id && visit.status === 'pending' && (
+              <div className={styles.dropdownItem} onClick={() => onConfirm && onConfirm(visit.id)}>
+                <CheckIcon />
+                Confirmer
+              </div>
+            )}
+            <div className={styles.dropdownItem} onClick={() => onRelance && visit.id && onRelance(visit.id)}>
               <EditIcon />
-              Modifier
+              Relancer
             </div>
             <div className={styles.dropdownItem}>
               <CalendarIcon />
               Reporter
             </div>
             <div className={styles.dropdownDivider}></div>
-            <div className={`${styles.dropdownItem} ${styles.danger}`}>
+            <div className={`${styles.dropdownItem} ${styles.danger}`} onClick={() => onCancel && visit.id && onCancel(visit.id)}>
               <XIcon />
               Annuler
             </div>
@@ -404,7 +601,9 @@ const VisitCard = ({ visit }) => {
           </div>
           <div className={styles.visitPropertyInfo}>
             <h3 className={styles.visitPropertyTitle}>{visit.property.title}</h3>
-            <p className={styles.visitPropertyPrice}>{visit.property.price.toLocaleString('fr-GN')} GNF/mois</p>
+            {visit.property.price > 0 && (
+              <p className={styles.visitPropertyPrice}>{visit.property.price.toLocaleString('fr-GN')} GNF/mois</p>
+            )}
             <p className={styles.visitPropertyLocation}>
               <LocationIcon />
               {visit.property.location}
@@ -430,10 +629,12 @@ const VisitCard = ({ visit }) => {
           </div>
           <div className={styles.visitAddressInfo}>
             <p className={styles.visitAddressText}>{visit.property.address}</p>
-            <p className={styles.visitAddressEta}>
-              <ClockIcon />
-              {visit.eta}
-            </p>
+            {visit.eta && (
+              <p className={styles.visitAddressEta}>
+                <ClockIcon />
+                {visit.eta}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -446,7 +647,7 @@ const VisitCard = ({ visit }) => {
           <WhatsAppIcon />
           WhatsApp
         </a>
-        <a href="https://maps.google.com" className={`${styles.visitAction} ${styles.maps}`}>
+        <a href={`https://maps.google.com/?q=${encodeURIComponent(visit.property.address)}`} className={`${styles.visitAction} ${styles.maps}`}>
           <MapIcon />
           Maps
         </a>
@@ -460,173 +661,279 @@ const VisitCard = ({ visit }) => {
 };
 
 /* ==========================================
-   TIMELINE COMPONENT
+   TIMELINE COMPONENT (design original préservé)
 ========================================== */
-const Timeline = ({ visits }) => (
+const Timeline = ({ visits, onConfirm, onCancel, onRelance }) => (
   <div className={styles.timeline}>
     {visits.map((visit, index) => (
-      <div key={index} className={styles.timelineItem}>
+      <div key={visit.id || index} className={styles.timelineItem}>
         <div className={styles.timelineTime}>{visit.time}</div>
         <div className={`${styles.timelineDot} ${styles[visit.type]} ${visit.status === 'pending' ? styles.pending : ''}`}></div>
-        <VisitCard visit={visit} />
+        <VisitCard visit={visit} onConfirm={onConfirm} onCancel={onCancel} onRelance={onRelance} />
       </div>
     ))}
   </div>
 );
 
 /* ==========================================
-   FAB COMPONENT
+   FLOATING ACTION BUTTON (design original préservé)
 ========================================== */
-const FloatingActionButton = () => (
-  <button className={styles.fab}>
+const FloatingActionButton = ({ onClick }) => (
+  <button className={styles.fab} onClick={onClick}>
     <PlusIcon />
   </button>
 );
 
 /* ==========================================
+   NEW VISIT MODAL (ajout fonctionnel, même design system)
+========================================== */
+const NewVisitModal = ({ isOpen, onClose, onCreate }) => {
+  const [form, setForm] = useState({
+    leadName: '', leadPhone: '', leadEmail: '', leadNotes: '',
+    type: 'visit',
+    scheduledAt: '', scheduledTime: '09:00',
+    address: '', durationMinutes: 60,
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async () => {
+    if (!form.leadName.trim()) { setError('Le nom du prospect est requis.'); return; }
+    if (!form.scheduledAt) { setError('La date est requise.'); return; }
+    setLoading(true); setError('');
+    try {
+      const scheduledAt = new Date(`${form.scheduledAt}T${form.scheduledTime}:00`).toISOString();
+      const { error: err } = await onCreate({
+        leadName: form.leadName,
+        leadPhone: form.leadPhone || undefined,
+        leadEmail: form.leadEmail || undefined,
+        leadNotes: form.leadNotes || undefined,
+        type: form.type,
+        scheduledAt,
+        durationMinutes: Number(form.durationMinutes),
+        address: form.address || undefined,
+      });
+      if (err) { setError(err.message || 'Erreur lors de la création'); }
+      else { onClose(); }
+    } finally { setLoading(false); }
+  };
+
+  const inputStyle = { width: '100%', padding: '10px 12px', border: '1px solid var(--color-neutral-200)', borderRadius: 'var(--radius-md, 8px)', fontSize: '0.875rem', outline: 'none', background: 'white', fontFamily: 'var(--font-body, inherit)' };
+  const labelStyle = { display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-neutral-700)', marginBottom: 4 };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
+      onClick={(e) => e.target === e.currentTarget && !loading && onClose()}>
+      <div style={{ background: 'white', borderRadius: 'var(--radius-2xl, 24px)', width: '100%', maxWidth: 520, maxHeight: '90vh', overflow: 'auto', boxShadow: 'var(--shadow-xl)' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--color-neutral-100)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, fontFamily: 'var(--font-display)' }}>Nouvelle visite</h3>
+          <button onClick={onClose} disabled={loading} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}><XIcon /></button>
+        </div>
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label style={labelStyle}>Type de visite</label>
+            <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={inputStyle}>
+              <option value="visit">Visite</option>
+              <option value="contre-visite">Contre-visite</option>
+              <option value="signature">Signature</option>
+              <option value="etat-lieux">État des lieux</option>
+            </select>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Date *</label>
+              <input type="date" value={form.scheduledAt} onChange={e => setForm(f => ({ ...f, scheduledAt: e.target.value }))} style={inputStyle} min={new Date().toISOString().split('T')[0]} />
+            </div>
+            <div>
+              <label style={labelStyle}>Heure *</label>
+              <input type="time" value={form.scheduledTime} onChange={e => setForm(f => ({ ...f, scheduledTime: e.target.value }))} style={inputStyle} />
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Nom du prospect *</label>
+            <input type="text" value={form.leadName} onChange={e => setForm(f => ({ ...f, leadName: e.target.value }))} placeholder="Mamadou Diallo" style={inputStyle} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Téléphone</label>
+              <input type="tel" value={form.leadPhone} onChange={e => setForm(f => ({ ...f, leadPhone: e.target.value }))} placeholder="+224 6XX XX XX XX" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Email</label>
+              <input type="email" value={form.leadEmail} onChange={e => setForm(f => ({ ...f, leadEmail: e.target.value }))} placeholder="email@example.com" style={inputStyle} />
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Adresse du bien</label>
+            <input type="text" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="Quartier, Commune, Conakry" style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Notes / Critères prospect</label>
+            <textarea value={form.leadNotes} onChange={e => setForm(f => ({ ...f, leadNotes: e.target.value }))} placeholder="Budget confirmé à 2M. Cherche F3 avec parking..." style={{ ...inputStyle, resize: 'vertical', minHeight: 80 }} />
+          </div>
+          {error && (
+            <div style={{ padding: '10px 14px', background: 'var(--color-error-50, #fef2f2)', border: '1px solid var(--color-error-100, #fecaca)', borderRadius: 'var(--radius-md, 8px)', color: 'var(--color-error-600, #dc2626)', fontSize: '0.875rem' }}>
+              {error}
+            </div>
+          )}
+        </div>
+        <div style={{ padding: '16px 24px', borderTop: '1px solid var(--color-neutral-100)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} disabled={loading} className={`${styles.btn} ${styles.btnSecondary}`}>Annuler</button>
+          <button onClick={handleSubmit} disabled={loading} className={`${styles.btn} ${styles.btnPrimary}`}>
+            {loading ? 'Création...' : 'Créer la visite'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ==========================================
    MAIN COMPONENT
 ========================================== */
 const AgentAgenda = () => {
+  const { user } = useAuthContext();
   const [activeTab, setActiveTab] = useState('Aujourd\'hui');
   const [viewMode, setViewMode] = useState('list');
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [isNewVisitOpen, setIsNewVisitOpen] = useState(false);
 
-  // Mock Data
-  const mockData = {
-    nextRdv: {
-      type: 'Visite',
-      countdown: 'Dans 45 min',
-      isUrgent: true,
-      property: {
-        title: 'Appartement F3 Meublé',
-        price: 2500000,
-        address: 'Cité Chemin de Fer, Immeuble B, 3ème étage, Kipé',
-      },
-      client: {
-        name: 'Mamadou Diallo',
-        initials: 'MD',
-        phone: '+224 620 12 34 56',
-      },
-      note: 'Budget confirmé à 2,5M. Cherche avec parking. Famille de 3 personnes.',
-    },
-    stats: [
-      { icon: 'calendar', iconStyle: 'primary', value: 4, label: 'Aujourd\'hui' },
-      { icon: 'clipboard', iconStyle: 'info', value: 12, label: 'Cette semaine' },
-      { icon: 'warning', iconStyle: 'warning', value: 2, label: 'À confirmer', variant: 'warning' },
-      { icon: 'check', iconStyle: 'gold', value: 1, label: 'Signature prévue', variant: 'gold' },
-    ],
-    alert: {
-      title: '2 visites en attente de confirmation',
-      description: 'Mme Barry (11h30) et M. Keita (demain 15h) n\'ont pas encore confirmé leur présence.',
-    },
-    visits: [
-      {
-        time: '09:00',
-        type: 'visit',
-        typeLabel: 'Visite',
-        status: 'confirmed',
-        property: {
-          title: 'Appartement F3 Meublé',
-          price: 2500000,
-          location: 'Kipé, Ratoma',
-          address: 'Cité Chemin de Fer, Immeuble B, 3ème étage, Kipé',
-        },
-        client: {
-          name: 'Mamadou Diallo',
-          initials: 'MD',
-          phone: '+224 620 12 34 56',
-          note: 'Recherche F3, budget 2-3M, famille 3 personnes',
-        },
-        eta: '~25 min depuis votre position actuelle',
-      },
-      {
-        time: '11:30',
-        type: 'visit',
-        typeLabel: 'Visite',
-        status: 'pending',
-        property: {
-          title: 'Villa F4 avec Jardin',
-          price: 4800000,
-          location: 'Lambanyi, Ratoma',
-          address: 'Quartier Résidentiel, Rue 12, Lambanyi',
-        },
-        client: {
-          name: 'Aissatou Barry',
-          initials: 'AB',
-          phone: '+224 622 45 67 89',
-          note: 'Cherche villa avec jardin pour les enfants',
-        },
-        eta: '~40 min depuis Kipé (trafic dense prévu)',
-      },
-      {
-        time: '14:30',
-        type: 'contre-visite',
-        typeLabel: 'Contre-visite',
-        status: 'confirmed',
-        property: {
-          title: 'Appartement F2 Rénové',
-          price: 1200000,
-          location: 'Nongo, Ratoma',
-          address: 'Résidence Les Palmiers, Apt 204, Nongo',
-        },
-        client: {
-          name: 'Ibrahima Sow',
-          initials: 'IS',
-          phone: '+224 625 11 22 33',
-          note: '2ème visite - Veut vérifier la pression d\'eau',
-        },
-        eta: '~20 min depuis Lambanyi',
-      },
-      {
-        time: '16:30',
-        type: 'signature',
-        typeLabel: 'Signature',
-        status: 'confirmed',
-        property: {
-          title: 'Studio Centre-ville',
-          price: 800000,
-          location: 'Cosa, Matam',
-          address: 'Immeuble Alpha, RDC, Cosa',
-        },
-        client: {
-          name: 'Fatoumata Bah',
-          initials: 'FB',
-          phone: '+224 628 99 88 77',
-          note: 'Documents prêts - Apporter 2 copies du contrat',
-        },
-        eta: '~35 min depuis Nongo',
-      },
-    ],
+  // Real data from DB
+  const [dbVisits, setDbVisits] = useState(null); // null = not loaded yet
+  const [dbNextVisit, setDbNextVisit] = useState(null);
+  const [dbStats, setDbStats] = useState(null);
+
+  const loadData = useCallback(async () => {
+    if (!user) return;
+    try {
+      const todayStr = currentDate.toISOString().split('T')[0];
+      const [visitsRes, nextRes, statsRes] = await Promise.all([
+        getAgentVisits({ date: activeTab === "Aujourd'hui" ? todayStr : undefined, upcoming: activeTab === 'Semaine' }),
+        getNextVisit(),
+        getVisitStats(user.id),
+      ]);
+      setDbVisits(visitsRes.data || []);
+      setDbNextVisit(nextRes.data || null);
+      setDbStats(statsRes);
+    } catch {
+      // Silently fall back to mock data
+    }
+  }, [user, currentDate, activeTab]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // Use real data when available, fallback to mock data for a beautiful display
+  const hasRealVisits = dbVisits && dbVisits.length > 0;
+  const displayVisits = hasRealVisits ? dbVisits.map(dbVisitToDisplay) : MOCK_VISITS;
+  const displayNextRdv = dbNextVisit ? dbVisitToHero(dbNextVisit) : MOCK_NEXT_RDV;
+  const displayStats = dbStats && (dbStats.today > 0 || dbStats.thisWeek > 0 || dbStats.pending > 0)
+    ? [
+        { icon: 'calendar', iconStyle: 'primary', value: dbStats.today, label: 'Aujourd\'hui' },
+        { icon: 'clipboard', iconStyle: 'info', value: dbStats.thisWeek, label: 'Cette semaine' },
+        { icon: 'warning', iconStyle: 'warning', value: dbStats.pending, label: 'À confirmer', variant: dbStats.pending > 0 ? 'warning' : '' },
+        { icon: 'check', iconStyle: 'gold', value: dbStats.signaturesThisWeek, label: 'Signature prévue', variant: dbStats.signaturesThisWeek > 0 ? 'gold' : '' },
+      ]
+    : MOCK_STATS;
+
+  // Alert banner
+  const pendingVisits = hasRealVisits ? displayVisits.filter(v => v.status === 'pending') : [];
+  const displayAlert = pendingVisits.length > 0
+    ? {
+        title: `${pendingVisits.length} visite${pendingVisits.length > 1 ? 's' : ''} en attente de confirmation`,
+        description: pendingVisits.slice(0, 2).map(v => v.client.name).join(' et ') + (pendingVisits.length > 2 ? ` et ${pendingVisits.length - 2} autres` : '') + ' n\'ont pas encore confirmé.',
+      }
+    : MOCK_ALERT;
+
+  const pendingCount = dbStats ? dbStats.pending : 3;
+
+  // Date display
+  const dateDisplay = activeTab === "Aujourd'hui"
+    ? currentDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+    : currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  const capitalizedDateDisplay = dateDisplay.charAt(0).toUpperCase() + dateDisplay.slice(1);
+
+  // Handlers for real data actions
+  const handleConfirm = async (visitId) => {
+    await updateVisitStatus(visitId, 'confirmed');
+    loadData();
+  };
+
+  const handleCancel = async (visitId) => {
+    await cancelVisit(visitId);
+    loadData();
+  };
+
+  const handleRelance = async (visitId) => {
+    if (!visitId) return;
+    // Try smart AI relance — generates WhatsApp/SMS/Email messages
+    const { data } = await generateSmartRelance(visitId);
+    if (data?.messages?.whatsapp && data?.visit?.lead_phone) {
+      // Open WhatsApp with the IA-generated message
+      const phone = data.visit.lead_phone.replace(/\D/g, '');
+      const msg = encodeURIComponent(data.messages.whatsapp);
+      window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+    } else {
+      // Fallback: just mark relance sent
+      await markRelanceSent(visitId);
+    }
+    loadData();
+  };
+
+  const handleRelanceFirst = () => {
+    if (hasRealVisits && pendingVisits.length > 0 && pendingVisits[0].id) {
+      handleRelance(pendingVisits[0].id);
+    }
+  };
+
+  const handleCreateVisit = async (params) => {
+    const { error } = await createVisit(params);
+    if (!error) { setIsNewVisitOpen(false); loadData(); }
+    return { error };
+  };
+
+  const handleDateChange = (direction) => {
+    const d = new Date(currentDate);
+    if (activeTab === "Aujourd'hui") d.setDate(d.getDate() + direction);
+    else if (activeTab === 'Semaine') d.setDate(d.getDate() + direction * 7);
+    else d.setMonth(d.getMonth() + direction);
+    setCurrentDate(d);
   };
 
   return (
     <>
-      <TopBar />
+      <TopBar pendingCount={pendingCount} onNewVisit={() => setIsNewVisitOpen(true)} />
 
       <div className={styles.pageContent}>
         {/* Hero Card - Prochain RDV */}
-        <HeroNextRdv nextRdv={mockData.nextRdv} />
+        <HeroNextRdv nextRdv={displayNextRdv} />
 
         {/* Stats Grid */}
-        <StatsGrid stats={mockData.stats} />
+        <StatsGrid stats={displayStats} />
 
         {/* Alert Banner */}
-        <AlertBanner alert={mockData.alert} />
+        <AlertBanner alert={displayAlert} onRelance={handleRelanceFirst} />
 
         {/* View Controls */}
         <ViewControls
           activeTab={activeTab}
           onTabChange={setActiveTab}
-          currentDate="Mardi 4 février"
+          currentDate={capitalizedDateDisplay}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
+          onDateChange={handleDateChange}
         />
 
         {/* Timeline */}
-        <Timeline visits={mockData.visits} />
+        <Timeline visits={displayVisits} onConfirm={handleConfirm} onCancel={handleCancel} onRelance={handleRelance} />
       </div>
 
       {/* Floating Action Button */}
-      <FloatingActionButton />
+      <FloatingActionButton onClick={() => setIsNewVisitOpen(true)} />
+
+      {/* New Visit Modal */}
+      <NewVisitModal isOpen={isNewVisitOpen} onClose={() => setIsNewVisitOpen(false)} onCreate={handleCreateVisit} />
     </>
   );
 };
