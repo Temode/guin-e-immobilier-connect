@@ -1,12 +1,9 @@
 /**
  * Edge Function: ai-agent-chat
  *
- * Chat IA pour l'agent immobilier — utilise Qwent (Qwen API via DashScope).
- * L'IA a accès au contexte de l'agent : visites du jour, prospects,
- * statistiques, et peut analyser les situations et donner des conseils.
- *
- * Modèle gratuit : qwen-plus (Qwen3-Plus) — rapide, illimité
- * Modèle avancé  : qwen-max  (Qwen3-Max) — analyses stratégiques
+ * Chat IA pour l'agent immobilier — utilise Gemini API.
+ * Modèle rapide  : gemini-2.5-flash — conversations courantes
+ * Modèle avancé  : gemini-2.5-pro   — analyses stratégiques
  */
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -17,7 +14,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const QWEN_API_URL = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions';
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 const SYSTEM_PROMPT = `Tu es ARIA, l'assistante IA intelligente et proactive de la plateforme Guin-e Immobilier.
 Tu travailles dans l'ombre pour aider les agents immobiliers guinéens à maximiser leurs performances.
@@ -50,7 +47,6 @@ serve(async (req) => {
   }
 
   try {
-    // Verify caller is authenticated
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Non authentifié' }), {
@@ -124,73 +120,63 @@ serve(async (req) => {
       };
     }
 
-    // Build context injection
     const contextMessage = agentContext.todayVisits?.length > 0
       ? `\n\n[CONTEXTE AGENT - ${agentContext.currentTime}]\nAgent: ${agentContext.agentName} (plan ${agentContext.plan})\nVisites aujourd'hui: ${JSON.stringify(agentContext.todayVisits, null, 2)}`
       : `\n\n[CONTEXTE AGENT - ${agentContext.currentTime}]\nAgent: ${agentContext.agentName || 'Agent'}\nAucune visite programmée aujourd'hui.`;
 
-    // Select model based on request type
     const isAdvanced = !!useAdvancedModel;
-    const model = isAdvanced ? 'qwen-max' : 'qwen-plus';
+    const model = isAdvanced ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
 
-    const qwenApiKey = Deno.env.get('QWEN_API_KEY');
-    if (!qwenApiKey) {
-      return new Response(JSON.stringify({ error: 'Clé API IA non configurée' }), {
+    const geminiKey = Deno.env.get('GEMINI_API_KEY');
+    if (!geminiKey) {
+      return new Response(JSON.stringify({ error: 'Clé API Gemini non configurée' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Build messages array for Qwen (OpenAI-compatible format)
-    const messages = [
-      { role: 'system', content: SYSTEM_PROMPT + contextMessage },
-      ...conversationHistory.map((m) => ({ role: m.role, content: m.content })),
-      {
-        role: 'user',
-        content: message,
-      },
+    // Build contents for Gemini (role: user/model)
+    const contents = [
+      ...conversationHistory.map((m) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      })),
+      { role: 'user', parts: [{ text: message }] },
     ];
 
-    // Call Qwen API (DashScope OpenAI-compatible)
-    const qwenRes = await fetch(QWEN_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${qwenApiKey}`,
+    // Call Gemini API
+    const geminiRes = await fetch(
+      `${GEMINI_BASE}/${model}:generateContent?key=${geminiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: SYSTEM_PROMPT + contextMessage }] },
+          contents,
+          generationConfig: { maxOutputTokens: 1024 },
+        }),
       },
-      body: JSON.stringify({
-        model,
-        max_tokens: 1024,
-        messages,
-      }),
-    });
+    );
 
-    if (!qwenRes.ok) {
-      const errBody = await qwenRes.text();
-      throw new Error(`Qwen API error (${qwenRes.status}): ${errBody}`);
+    if (!geminiRes.ok) {
+      const errBody = await geminiRes.text();
+      throw new Error(`Gemini API error (${geminiRes.status}): ${errBody}`);
     }
 
-    const qwenData = await qwenRes.json();
-    const assistantMessage = qwenData.choices?.[0]?.message?.content || 'Je n\'ai pas pu générer une réponse.';
-    const tokensUsed = (qwenData.usage?.prompt_tokens || 0) + (qwenData.usage?.completion_tokens || 0);
+    const geminiData = await geminiRes.json();
+    const assistantMessage =
+      geminiData.candidates?.[0]?.content?.parts?.[0]?.text || 'Je n\'ai pas pu générer une réponse.';
+    const tokensUsed =
+      (geminiData.usageMetadata?.promptTokenCount || 0) +
+      (geminiData.usageMetadata?.candidatesTokenCount || 0);
 
-    // Save user message and assistant response to DB
+    // Save to DB
     await supabaseAdmin.from('ai_conversations').insert([
-      {
-        agent_id: user.id,
-        role: 'user',
-        content: message,
-        metadata: { model },
-      },
-      {
-        agent_id: user.id,
-        role: 'assistant',
-        content: assistantMessage,
-        metadata: { model, tokens_used: tokensUsed },
-      },
+      { agent_id: user.id, role: 'user', content: message, metadata: { model } },
+      { agent_id: user.id, role: 'assistant', content: assistantMessage, metadata: { model, tokens_used: tokensUsed } },
     ]);
 
-    // Track AI usage
+    // Track usage
     await supabaseAdmin.rpc('increment_ai_usage', {
       p_agent_id: user.id,
       p_is_advanced: isAdvanced,
@@ -198,11 +184,7 @@ serve(async (req) => {
     });
 
     return new Response(
-      JSON.stringify({
-        message: assistantMessage,
-        model,
-        tokensUsed,
-      }),
+      JSON.stringify({ message: assistantMessage, model, tokensUsed }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (error) {

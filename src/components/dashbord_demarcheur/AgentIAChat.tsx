@@ -37,8 +37,8 @@ function fmtTime(isoStr: string): string {
 /* ─── Model label ─── */
 function modelLabel(model: string): string {
   if (!model) return '';
-  if (model.includes('qwen-max')) return 'Qwen3-Max';
-  if (model.includes('qwen-plus')) return 'Qwen3-Plus';
+  if (model.includes('gemini-2.5-pro')) return 'Gemini Pro';
+  if (model.includes('gemini-2.5-flash')) return 'Gemini Flash';
   return model;
 }
 
@@ -155,7 +155,7 @@ export default function AgentIAChat() {
       role: 'assistant',
       content: data.report,
       created_at: new Date().toISOString(),
-      metadata: { model: 'qwen-max', tokens_used: data.tokensUsed, type: 'daily_report' },
+      metadata: { model: 'gemini-2.5-pro', tokens_used: data.tokensUsed, type: 'daily_report' },
     };
 
     setMessages((prev) => {
@@ -241,7 +241,7 @@ export default function AgentIAChat() {
 
   const handleToggleAdvanced = () => {
     if (!useAdvanced && usage?.limit_reached) {
-      setError('Limite de crédits Qwen3-Max atteinte ce mois-ci. Utilisez le mode Rapide (Qwen3-Plus).');
+      setError('Limite de crédits Gemini Pro atteinte ce mois-ci. Utilisez le mode Rapide (Gemini Flash).');
       return;
     }
     setUseAdvanced((v) => !v);
@@ -256,14 +256,14 @@ export default function AgentIAChat() {
         <div className={styles.ariaAvatar}>✨</div>
         <div className={styles.ariaInfo}>
           <h1 className={styles.ariaName}>ARIA — Assistante IA</h1>
-          <span className={styles.ariaStatus}>En ligne · Propulsée par Qwent</span>
+          <span className={styles.ariaStatus}>En ligne · Propulsée par Gemini</span>
         </div>
 
         {/* Usage counter */}
         {usage && (
           <div
             className={styles.usageCounter}
-            title={`${usage.advanced_used}/${usage.advanced_limit} messages Qwen3-Max utilisés ce mois`}
+            title={`${usage.advanced_used}/${usage.advanced_limit} messages Gemini Pro utilisés ce mois`}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -286,7 +286,7 @@ export default function AgentIAChat() {
         <button
           className={`${styles.modelToggle} ${useAdvanced ? styles.advanced : ''}`}
           onClick={handleToggleAdvanced}
-          title={useAdvanced ? 'Mode Stratégique (Qwen3-Max) — cliquer pour basculer' : 'Mode Rapide (Qwen3-Plus) — cliquer pour basculer'}
+          title={useAdvanced ? 'Mode Stratégique (Gemini Pro) — cliquer pour basculer' : 'Mode Rapide (Gemini Flash) — cliquer pour basculer'}
         >
           <SparkleIcon />
           <span>{useAdvanced ? 'Stratégique' : 'Rapide'}</span>
@@ -330,7 +330,7 @@ export default function AgentIAChat() {
             <div className={styles.welcomeIcon}>✨</div>
             <h2>Bonjour {agentName.split(' ')[0]} !</h2>
             <p>
-              Je suis <strong>ARIA</strong>, votre assistante IA dédiée propulsée par Qwent. Je connais votre agenda,
+              Je suis <strong>ARIA</strong>, votre assistante IA dédiée propulsée par Gemini. Je connais votre agenda,
               vos prospects et le marché immobilier guinéen. Comment puis-je vous aider aujourd'hui ?
             </p>
             <div className={styles.welcomeSuggestions}>
@@ -417,7 +417,7 @@ export default function AgentIAChat() {
           </button>
         </div>
         <p className={styles.inputHint}>
-          Mode : {useAdvanced ? '⚡ Stratégique (Qwen3-Max)' : '🚀 Rapide (Qwen3-Plus)'}
+          Mode : {useAdvanced ? '⚡ Stratégique (Gemini Pro)' : '🚀 Rapide (Gemini Flash)'}
           {usage && ` · ${usage.advanced_used}/${usage.advanced_limit} avancés`}
           {' '}· Maj+Entrée pour saut de ligne
         </p>
