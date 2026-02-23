@@ -52,7 +52,7 @@ export async function getAgentVisits(options?: {
   status?: Visit['status'];
   upcoming?: boolean;    // only future visits
 }): Promise<{ data: Visit[]; error: Error | null }> {
-  let query = supabase
+  let query = (supabase as any)
     .from('visits')
     .select('*, property:property_id(id, title, type, city, commune, address)')
     .order('scheduled_at', { ascending: true });
@@ -103,7 +103,7 @@ export async function getVisitStats(agentId: string): Promise<{
   weekEnd.setDate(weekStart.getDate() + 6);
   weekEnd.setHours(23, 59, 59, 999);
 
-  const { data: all, error } = await supabase
+  const { data: all, error } = await (supabase as any)
     .from('visits')
     .select('scheduled_at, status, type')
     .eq('agent_id', agentId)
@@ -138,7 +138,7 @@ export async function createVisit(params: CreateVisitParams): Promise<{ data: Vi
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { data: null, error: new Error('Non authentifié') };
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('visits')
     .insert({
       agent_id: user.id,
@@ -167,7 +167,7 @@ export async function updateVisitStatus(
   visitId: string,
   status: Visit['status'],
 ): Promise<{ error: Error | null }> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('visits')
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', visitId);
@@ -186,7 +186,7 @@ export async function cancelVisit(visitId: string): Promise<{ error: Error | nul
  * Mark relance as sent and update status to pending (awaiting response)
  */
 export async function markRelanceSent(visitId: string): Promise<{ error: Error | null }> {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('visits')
     .update({
       relance_sent_at: new Date().toISOString(),
@@ -202,7 +202,7 @@ export async function markRelanceSent(visitId: string): Promise<{ error: Error |
  * Get the next upcoming visit (for the hero card)
  */
 export async function getNextVisit(): Promise<{ data: Visit | null; error: Error | null }> {
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('visits')
     .select('*, property:property_id(id, title, type, city, commune, address)')
     .gte('scheduled_at', new Date().toISOString())

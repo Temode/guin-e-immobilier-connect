@@ -69,7 +69,7 @@ serve(async (req) => {
     const reportContext = `Données agent "${agentName}" au ${now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} :
 
 VISITES HIER: ${yesterdayVisits.length > 0 ? yesterdayVisits.map(v => `${v.lead_name} (${v.type}) → ${v.status}`).join(', ') : 'Aucune'}
-VISITES AUJOURD'HUI: ${todayVisits.length > 0 ? todayVisits.map(v => `${new Date(v.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}: ${v.lead_name} (${v.type}, ${v.status}) — ${v.property?.title || 'Bien'} à ${v.property?.city || v.address || 'Conakry'}`).join(' | ') : 'Aucune'}
+VISITES AUJOURD'HUI: ${todayVisits.length > 0 ? todayVisits.map((v: any) => `${new Date(v.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}: ${v.lead_name} (${v.type}, ${v.status}) — ${v.property?.title || 'Bien'} à ${v.property?.city || v.address || 'Conakry'}`).join(' | ') : 'Aucune'}
 STATS SEMAINE: ${weekTotal} visites, ${weekCompleted} terminées, ${weekSignatures} signatures, ${weekRelanced} relances, ${conversionRate}% conversion
 PROSPECTS CHAUDS: ${hotProspects.length > 0 ? hotProspects.map(v => `🔥 ${v.lead_name} (${v.type})`).join(', ') : 'Aucun'}
 EN ATTENTE: ${todayVisits.filter(v => v.status === 'pending').length} visite(s) à confirmer`;
