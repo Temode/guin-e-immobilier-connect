@@ -1,12 +1,12 @@
 /**
  * Edge Function: ai-agent-chat
  *
- * Chat IA pour l'agent immobilier — utilise Claude (Anthropic API).
+ * Chat IA pour l'agent immobilier — utilise Qwent (Qwen API via DashScope).
  * L'IA a accès au contexte de l'agent : visites du jour, prospects,
  * statistiques, et peut analyser les situations et donner des conseils.
  *
- * Modèle : claude-haiku-4-5-20251001 (rapide, économique)
- * Escalade : claude-sonnet-4-5-20250929 pour les analyses stratégiques
+ * Modèle gratuit : qwen-plus (Qwen3-Plus) — rapide, illimité
+ * Modèle avancé  : qwen-max  (Qwen3-Max) — analyses stratégiques
  */
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -16,6 +16,8 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const QWEN_API_URL = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions';
 
 const SYSTEM_PROMPT = `Tu es ARIA, l'assistante IA intelligente et proactive de la plateforme Guin-e Immobilier.
 Tu travailles dans l'ombre pour aider les agents immobiliers guinéens à maximiser leurs performances.
@@ -128,51 +130,49 @@ serve(async (req) => {
       : `\n\n[CONTEXTE AGENT - ${agentContext.currentTime}]\nAgent: ${agentContext.agentName || 'Agent'}\nAucune visite programmée aujourd'hui.`;
 
     // Select model based on request type
-    const model = useAdvancedModel
-      ? 'claude-sonnet-4-5-20250929'
-      : 'claude-haiku-4-5-20251001';
+    const isAdvanced = !!useAdvancedModel;
+    const model = isAdvanced ? 'qwen-max' : 'qwen-plus';
 
-    const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!anthropicKey) {
+    const qwenApiKey = Deno.env.get('QWEN_API_KEY');
+    if (!qwenApiKey) {
       return new Response(JSON.stringify({ error: 'Clé API IA non configurée' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Build messages array for Claude
+    // Build messages array for Qwen (OpenAI-compatible format)
     const messages = [
+      { role: 'system', content: SYSTEM_PROMPT + contextMessage },
       ...conversationHistory.map((m) => ({ role: m.role, content: m.content })),
       {
         role: 'user',
-        content: message + (conversationHistory.length === 0 ? contextMessage : ''),
+        content: message,
       },
     ];
 
-    // Call Claude API
-    const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+    // Call Qwen API (DashScope OpenAI-compatible)
+    const qwenRes = await fetch(QWEN_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${qwenApiKey}`,
       },
       body: JSON.stringify({
         model,
         max_tokens: 1024,
-        system: SYSTEM_PROMPT + contextMessage,
         messages,
       }),
     });
 
-    if (!claudeRes.ok) {
-      const errBody = await claudeRes.text();
-      throw new Error(`Claude API error (${claudeRes.status}): ${errBody}`);
+    if (!qwenRes.ok) {
+      const errBody = await qwenRes.text();
+      throw new Error(`Qwen API error (${qwenRes.status}): ${errBody}`);
     }
 
-    const claudeData = await claudeRes.json();
-    const assistantMessage = claudeData.content?.[0]?.text || 'Je n\'ai pas pu générer une réponse.';
-    const tokensUsed = claudeData.usage?.input_tokens + claudeData.usage?.output_tokens || 0;
+    const qwenData = await qwenRes.json();
+    const assistantMessage = qwenData.choices?.[0]?.message?.content || 'Je n\'ai pas pu générer une réponse.';
+    const tokensUsed = (qwenData.usage?.prompt_tokens || 0) + (qwenData.usage?.completion_tokens || 0);
 
     // Save user message and assistant response to DB
     await supabaseAdmin.from('ai_conversations').insert([
@@ -189,6 +189,13 @@ serve(async (req) => {
         metadata: { model, tokens_used: tokensUsed },
       },
     ]);
+
+    // Track AI usage
+    await supabaseAdmin.rpc('increment_ai_usage', {
+      p_agent_id: user.id,
+      p_is_advanced: isAdvanced,
+      p_tokens: tokensUsed,
+    });
 
     return new Response(
       JSON.stringify({

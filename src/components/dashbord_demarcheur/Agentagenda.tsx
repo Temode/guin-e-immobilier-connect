@@ -13,6 +13,7 @@ import {
   formatVisitTime,
   formatCountdown,
 } from '@/services/agendaService';
+import { generateSmartRelance } from '@/services/aiAgentChatService';
 import styles from './AgentAgenda.module.css';
 
 /* ==========================================
@@ -865,7 +866,16 @@ const AgentAgenda = () => {
   };
 
   const handleRelance = async (visitId) => {
-    if (visitId) {
+    if (!visitId) return;
+    // Try smart AI relance — generates WhatsApp/SMS/Email messages
+    const { data } = await generateSmartRelance(visitId);
+    if (data?.messages?.whatsapp && data?.visit?.lead_phone) {
+      // Open WhatsApp with the IA-generated message
+      const phone = data.visit.lead_phone.replace(/\D/g, '');
+      const msg = encodeURIComponent(data.messages.whatsapp);
+      window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
+    } else {
+      // Fallback: just mark relance sent
       await markRelanceSent(visitId);
     }
     loadData();

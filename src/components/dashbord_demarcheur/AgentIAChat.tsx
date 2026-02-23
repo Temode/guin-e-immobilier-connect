@@ -5,13 +5,16 @@ import {
   sendMessageToAria,
   loadChatHistory,
   clearChatHistory,
+  generateDailyReport,
+  getMonthlyUsage,
   type ChatMessage,
+  type AIUsage,
 } from '@/services/aiAgentChatService';
 import styles from './AgentIAChat.module.css';
 
 /* ─── Quick-prompt suggestions ─── */
 const QUICK_PROMPTS = [
-  { label: '📋 Rapport du matin', text: 'Génère mon rapport d\'activité du matin : visites du jour, prospects à relancer, et recommandations.' },
+  { label: '📋 Rapport du matin', text: '__DAILY_REPORT__' },
   { label: '🔥 Prospects chauds', text: 'Analyse mes prospects actuels et identifie ceux qui sont prêts à signer.' },
   { label: '✉️ Message de relance', text: 'Rédige un message de relance professionnel pour un prospect qui n\'a pas répondu depuis 3 jours.' },
   { label: '📊 Stats semaine', text: 'Donne-moi un bilan de mes performances de la semaine : visites, signatures, taux de conversion.' },
@@ -34,8 +37,8 @@ function fmtTime(isoStr: string): string {
 /* ─── Model label ─── */
 function modelLabel(model: string): string {
   if (!model) return '';
-  if (model.includes('sonnet')) return 'Claude Sonnet';
-  if (model.includes('haiku')) return 'Claude Haiku';
+  if (model.includes('qwen-max')) return 'Qwen3-Max';
+  if (model.includes('qwen-plus')) return 'Qwen3-Plus';
   return model;
 }
 
@@ -68,6 +71,7 @@ export default function AgentIAChat() {
   const [useAdvanced, setUseAdvanced] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [usage, setUsage] = useState<AIUsage | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -77,12 +81,15 @@ export default function AgentIAChat() {
     ? '?'
     : agentName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
 
-  /* Load history on mount */
+  /* Load history + usage on mount */
   useEffect(() => {
     if (!user) return;
     loadChatHistory(40).then(({ data }) => {
       setMessages(data);
       setHistoryLoaded(true);
+    });
+    getMonthlyUsage().then(({ data }) => {
+      if (data) setUsage(data);
     });
   }, [user]);
 
@@ -111,9 +118,64 @@ export default function AgentIAChat() {
     }
   };
 
+  /* Refresh usage after each AI call */
+  const refreshUsage = useCallback(async () => {
+    const { data } = await getMonthlyUsage();
+    if (data) setUsage(data);
+  }, []);
+
+  /* Handle daily report (special quick prompt) */
+  const handleDailyReport = useCallback(async () => {
+    if (isLoading) return;
+    setError(null);
+    setIsTyping(true);
+    setIsLoading(true);
+
+    // Add a user message
+    const tempUserMsg: ChatMessage = {
+      id: `temp-${Date.now()}`,
+      role: 'user',
+      content: 'Génère mon rapport d\'activité du matin',
+      created_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, tempUserMsg]);
+
+    const { data, error: apiError } = await generateDailyReport();
+
+    setIsTyping(false);
+    setIsLoading(false);
+
+    if (apiError || !data) {
+      setError(apiError?.message || 'Erreur lors de la génération du rapport.');
+      return;
+    }
+
+    const assistantMsg: ChatMessage = {
+      id: `ai-report-${Date.now()}`,
+      role: 'assistant',
+      content: data.report,
+      created_at: new Date().toISOString(),
+      metadata: { model: 'qwen-max', tokens_used: data.tokensUsed, type: 'daily_report' },
+    };
+
+    setMessages((prev) => {
+      const withoutTemp = prev.filter((m) => m.id !== tempUserMsg.id);
+      const realUserMsg: ChatMessage = { ...tempUserMsg, id: `u-report-${Date.now()}` };
+      return [...withoutTemp, realUserMsg, assistantMsg];
+    });
+
+    refreshUsage();
+  }, [isLoading, refreshUsage]);
+
   const handleSend = useCallback(async (overrideText?: string) => {
     const text = (overrideText ?? input).trim();
     if (!text || isLoading) return;
+
+    // Handle special daily report trigger
+    if (text === '__DAILY_REPORT__') {
+      handleDailyReport();
+      return;
+    }
 
     setError(null);
     setInput('');
@@ -158,9 +220,15 @@ export default function AgentIAChat() {
       };
       return [...withoutTemp, realUserMsg, assistantMsg];
     });
-  }, [input, isLoading, useAdvanced]);
+
+    refreshUsage();
+  }, [input, isLoading, useAdvanced, handleDailyReport, refreshUsage]);
 
   const handleQuickPrompt = (text: string) => {
+    if (text === '__DAILY_REPORT__') {
+      handleDailyReport();
+      return;
+    }
     setInput(text);
     setTimeout(() => handleSend(text), 50);
   };
@@ -169,6 +237,14 @@ export default function AgentIAChat() {
     if (!window.confirm('Effacer tout l\'historique de conversation avec ARIA ?')) return;
     await clearChatHistory();
     setMessages([]);
+  };
+
+  const handleToggleAdvanced = () => {
+    if (!useAdvanced && usage?.limit_reached) {
+      setError('Limite de crédits Qwen3-Max atteinte ce mois-ci. Utilisez le mode Rapide (Qwen3-Plus).');
+      return;
+    }
+    setUseAdvanced((v) => !v);
   };
 
   const showWelcome = historyLoaded && messages.length === 0 && !isTyping;
@@ -180,14 +256,37 @@ export default function AgentIAChat() {
         <div className={styles.ariaAvatar}>✨</div>
         <div className={styles.ariaInfo}>
           <h1 className={styles.ariaName}>ARIA — Assistante IA</h1>
-          <span className={styles.ariaStatus}>En ligne · Prête à vous aider</span>
+          <span className={styles.ariaStatus}>En ligne · Propulsée par Qwent</span>
         </div>
+
+        {/* Usage counter */}
+        {usage && (
+          <div
+            className={styles.usageCounter}
+            title={`${usage.advanced_used}/${usage.advanced_limit} messages Qwen3-Max utilisés ce mois`}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 10px',
+              borderRadius: 20,
+              fontSize: '0.75rem',
+              fontWeight: 600,
+              background: usage.limit_reached ? 'var(--color-error-50, #fef2f2)' : 'var(--color-neutral-50, #f9fafb)',
+              color: usage.limit_reached ? 'var(--color-error-600, #dc2626)' : 'var(--color-neutral-600, #4b5563)',
+              border: `1px solid ${usage.limit_reached ? 'var(--color-error-200, #fecaca)' : 'var(--color-neutral-200, #e5e7eb)'}`,
+            }}
+          >
+            <span>{usage.limit_reached ? '🚫' : '⚡'}</span>
+            <span>{usage.advanced_used}/{usage.advanced_limit}</span>
+          </div>
+        )}
 
         {/* Model toggle */}
         <button
           className={`${styles.modelToggle} ${useAdvanced ? styles.advanced : ''}`}
-          onClick={() => setUseAdvanced((v) => !v)}
-          title={useAdvanced ? 'Mode Stratégique (Claude Sonnet) — cliquer pour basculer' : 'Mode Rapide (Claude Haiku) — cliquer pour basculer'}
+          onClick={handleToggleAdvanced}
+          title={useAdvanced ? 'Mode Stratégique (Qwen3-Max) — cliquer pour basculer' : 'Mode Rapide (Qwen3-Plus) — cliquer pour basculer'}
         >
           <SparkleIcon />
           <span>{useAdvanced ? 'Stratégique' : 'Rapide'}</span>
@@ -231,7 +330,7 @@ export default function AgentIAChat() {
             <div className={styles.welcomeIcon}>✨</div>
             <h2>Bonjour {agentName.split(' ')[0]} !</h2>
             <p>
-              Je suis <strong>ARIA</strong>, votre assistante IA dédiée. Je connais votre agenda,
+              Je suis <strong>ARIA</strong>, votre assistante IA dédiée propulsée par Qwent. Je connais votre agenda,
               vos prospects et le marché immobilier guinéen. Comment puis-je vous aider aujourd'hui ?
             </p>
             <div className={styles.welcomeSuggestions}>
@@ -318,8 +417,9 @@ export default function AgentIAChat() {
           </button>
         </div>
         <p className={styles.inputHint}>
-          Mode : {useAdvanced ? '⚡ Stratégique (Claude Sonnet)' : '🚀 Rapide (Claude Haiku)'} ·
-          Maj+Entrée pour saut de ligne
+          Mode : {useAdvanced ? '⚡ Stratégique (Qwen3-Max)' : '🚀 Rapide (Qwen3-Plus)'}
+          {usage && ` · ${usage.advanced_used}/${usage.advanced_limit} avancés`}
+          {' '}· Maj+Entrée pour saut de ligne
         </p>
       </div>
     </div>
