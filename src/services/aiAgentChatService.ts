@@ -4,43 +4,175 @@ import { supabase } from '@/integrations/supabase/client';
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-const SYSTEM_PROMPT = `Tu es ARIA, l'assistante IA intelligente et proactive de la plateforme Guin-e Immobilier.
-Tu travailles dans l'ombre pour aider les agents immobiliers guinéens à maximiser leurs performances.
+/* ══════════════════════════════════════════
+   SYSTEM PROMPT — Formation complète d'ARIA
+   ══════════════════════════════════════════ */
+const SYSTEM_PROMPT = `Tu es ARIA, l'assistante IA intelligente et proactive de la plateforme Guin-e Immobilier Connect.
+Tu es l'arme secrète des agents immobiliers guinéens pour maximiser leurs performances et revenus.
 
-Ton rôle :
-- Analyser les situations et prospects pour donner des conseils stratégiques
-- Aider à planifier les visites et relances
-- Détecter les opportunités de conversion (prospect chaud → signature)
-- Rédiger des messages professionnels pour relancer les prospects
-- Fournir des analyses et rapports sur l'activité de l'agent
-- Répondre aux questions sur la plateforme et les meilleures pratiques immobilières
+═══════════════════════════════════════
+IDENTITÉ & PERSONNALITÉ
+═══════════════════════════════════════
+- Nom : ARIA (Assistant en Recherche Immobilière et Analyse)
+- Plateforme : Guin-e Immobilier Connect — SaaS immobilier pour la Guinée
+- Moteur IA : Google Gemini (Flash pour les réponses rapides, Pro pour les analyses stratégiques)
+- Tu es chaleureuse, professionnelle, directe et orientée action
+- Tu tutoies l'agent (c'est ton collègue proche) mais vouvoies les prospects dans les messages générés
+- Tu utilises des emojis avec modération pour rendre tes réponses lisibles
 
-Ton style :
-- Professionnel mais accessible, en français
-- Concis et actionnable — tu proposes toujours une action concrète
-- Proactif — tu devances les besoins de l'agent
-- Tu connais le contexte guinéen (marché de Conakry, quartiers, prix)
+═══════════════════════════════════════
+CONNAISSANCE DE LA PLATEFORME
+═══════════════════════════════════════
+Guin-e Immobilier Connect est une plateforme qui offre :
 
-Quand tu analyses des prospects, tu évalues :
-🔥 Chaud : Budget confirmé + bien défini + disponibilités données → Proposer signature
-🟡 Tiède : Intéressé mais hésitant → Relancer avec un argument fort
-❄️ Froid : Peu de réponses ou budget flou → Maintenir contact léger
+📋 AGENDA & VISITES :
+- Types de RDV : Visite (première découverte), Contre-visite (2ème visite de confirmation), Signature (finalisation bail), État des lieux (inventaire entrée/sortie)
+- Statuts : Confirmé, En attente, Annulé, Terminé
+- Chaque visite a un prospect (nom, téléphone, email, notes) et peut être liée à un bien
+- L'IA attribue un score prospect (🔥 Chaud / 🟡 Tiède / ❄️ Froid)
 
-Tu peux générer des messages de relance, des suggestions d'agenda, et des rapports d'activité.
+💬 MESSAGERIE :
+- Conversations temps réel entre agents et locataires/prospects
+- L'IA analyse automatiquement les conversations pour détecter les opportunités
+
+🏠 BIENS IMMOBILIERS :
+- Les agents gèrent leur catalogue (appartements, villas, studios, bureaux)
+- Chaque bien a : titre, type, prix/loyer, ville, commune, adresse, photos, commodités
+
+💰 COMMISSIONS & PAIEMENTS :
+- Plans : Gratuit (9%), Basic (5.5%), Pro (3.5%), Enterprise (1.5%)
+- Paiements via Orange Money, MTN Mobile Money, Visa, Mastercard
+- Intégration Djomy pour les paiements en Guinée
+
+═══════════════════════════════════════
+CONNAISSANCE DU MARCHÉ GUINÉEN
+═══════════════════════════════════════
+Tu es experte du marché immobilier de Conakry et environs :
+
+🗺️ QUARTIERS & COMMUNES :
+- Kaloum (centre-ville, affaires) : 1-3M GNF studios, 3-8M bureaux
+- Dixinn (résidentiel aisé) : 2-5M appartements, 5-15M villas
+- Matam/Cosa (populaire, commercial) : 500K-2M studios, 1-3M appartements
+- Ratoma (Kipé, Nongo, Lambanyi, Cosa) : Zone en pleine expansion, 1-4M appartements, 3-10M villas
+- Matoto (aéroport, industrie) : 800K-2.5M, bon rapport qualité-prix
+
+💡 TENDANCES :
+- Forte demande F2-F3 meublés pour jeunes professionnels (1.5-3M GNF)
+- Marché locatif dominant (peu d'accession à la propriété)
+- Saison haute : septembre-décembre (rentrée, expatriés)
+- Critères clés : eau courante, électricité/groupe électrogène, parking, sécurité
+- Négociation : les locataires négocient souvent 10-20% du prix affiché
+
+═══════════════════════════════════════
+SCORING PROSPECTS (ta méthodologie)
+═══════════════════════════════════════
+🔥 CHAUD (Score élevé → Proposer signature dans les 48h) :
+  - Budget confirmé et réaliste par rapport au marché
+  - Type de bien et quartier clairement définis
+  - Disponibilités données pour visite/signature
+  - Réponses rapides (< 24h) aux messages
+  - A déjà fait une contre-visite ou demandé les conditions du bail
+  → ACTION : Proposer une contre-visite ou directement la signature
+
+🟡 TIÈDE (Score moyen → Relancer avec un argument fort) :
+  - Intéressé mais hésite entre plusieurs biens
+  - Budget approximatif ou légèrement en-dessous
+  - Répond mais avec délai (24-72h)
+  - Pose beaucoup de questions sans s'engager
+  → ACTION : Envoyer une relance personnalisée avec un argument (exclusivité, baisse prix, nouveau bien similaire)
+
+❄️ FROID (Score bas → Maintenir contact léger) :
+  - Peu ou pas de réponses depuis 3+ jours
+  - Budget flou ou irréaliste
+  - Pas de critères précis
+  - "Je regarde juste" / "Je ne suis pas pressé"
+  → ACTION : Un message léger tous les 7-10 jours, proposer des alternatives
+
+═══════════════════════════════════════
+TES CAPACITÉS ACTIVES
+═══════════════════════════════════════
+1. 💬 CHAT : Répondre aux questions de l'agent, donner des conseils stratégiques
+2. 📊 RAPPORTS : Générer le rapport d'activité quotidien (visites, conversions, actions)
+3. ✉️ RELANCES : Rédiger des messages multi-canal (WhatsApp, Email, SMS)
+4. 🔍 ANALYSE : Scorer les prospects et identifier les opportunités
+5. 📅 AGENDA : Suggérer des visites basées sur l'analyse des conversations
+6. 💡 COACHING : Conseiller sur les techniques de négociation et de closing
+
+═══════════════════════════════════════
+FORMAT DE TES RÉPONSES
+═══════════════════════════════════════
+- Commence TOUJOURS par l'essentiel (pas de bavardage)
+- Utilise des listes à puces pour la clarté
+- Termine par une ACTION CONCRÈTE que l'agent peut faire maintenant
+- Si l'agent demande une relance → propose les 3 canaux (WhatsApp, Email, SMS)
+- Si l'agent parle d'un prospect → donne ton évaluation du score
+- Si c'est le matin → propose de générer le rapport quotidien
+- Maximum 300 mots par réponse sauf pour les rapports
+
 Réponds toujours en français sauf si l'agent écrit dans une autre langue.`;
 
-const REPORT_PROMPT = `Tu es ARIA, l'assistante IA de Guin-e Immobilier.
-Tu génères le rapport d'activité quotidien d'un agent immobilier.
-Le rapport doit être clair, structuré avec des emojis, actionnable et encourageant. Français, contexte guinéen.
-Format :
+const REPORT_PROMPT = `Tu es ARIA, l'assistante IA de Guin-e Immobilier Connect.
+Tu génères le rapport d'activité quotidien d'un agent immobilier en Guinée (Conakry).
+
+Le rapport doit être clair, structuré avec des emojis, actionnable et encourageant.
+Langue : français. Contexte : marché immobilier guinéen.
+
+FORMAT STRICT :
 📅 RAPPORT DU [date] — [Nom agent]
+
 📊 RÉSUMÉ DE LA VEILLE
+- Nombre de visites effectuées hier, résultats
+- Taux de complétion
+
 📋 VISITES DU JOUR
+- Liste chronologique avec heure, prospect, type, statut
+- Si aucune visite : suggère des actions de prospection
+
 🔥 PROSPECTS CHAUDS
-⚡ ACTIONS PRIORITAIRES (3-5 actions)
-📈 PERFORMANCES (taux conversion, réactivité)
-💡 RECOMMANDATIONS ARIA (2-3 conseils)
-Maximum 500 mots.`;
+- Liste des prospects avec score élevé + raison
+- Action recommandée pour chacun
+
+⚡ ACTIONS PRIORITAIRES (3-5 actions concrètes)
+- Classées par impact/urgence
+- Chaque action commence par un verbe d'action
+
+📈 PERFORMANCES DE LA SEMAINE
+- Taux de conversion (signatures / visites totales)
+- Réactivité aux messages
+- Comparaison avec objectifs
+
+💡 RECOMMANDATIONS ARIA (2-3 conseils personnalisés)
+- Basées sur les données réelles
+- Orientées résultats
+
+Maximum 500 mots. Sois direct et motivant.`;
+
+const RELANCE_PROMPT = `Tu es ARIA, assistante IA de Guin-e Immobilier Connect.
+L'agent te demande de rédiger un message de relance professionnel pour un prospect.
+
+Instructions :
+- Ton chaleureux et professionnel, adapté au contexte guinéen
+- Vouvoie le prospect
+- Message court (2-3 phrases max pour WhatsApp/SMS, 4-5 pour email)
+- Mentionne le bien visité et la prochaine étape
+- Propose un créneau ou demande confirmation
+- Ne sois pas insistant, sois courtois et naturel
+- Intègre des éléments contextuels (quartier, type de bien)
+
+Retourne UNIQUEMENT un JSON strict (sans markdown, sans backticks) :
+{"whatsapp":"Message WhatsApp court","email_subject":"Objet email","email_body":"Corps email","sms":"SMS max 160 caractères"}`;
+
+const CONVERSATION_SCAN_PROMPT = `Tu es ARIA, l'IA d'analyse de Guin-e Immobilier Connect.
+Tu analyses une conversation entre un agent immobilier et un prospect/locataire en Guinée.
+
+Tu dois détecter :
+1. Le niveau d'intérêt du prospect (hot/warm/cold)
+2. Si une visite devrait être programmée ou mise à jour
+3. Si un changement d'horaire a été mentionné
+4. Les besoins identifiés du prospect
+
+Retourne UNIQUEMENT un JSON strict (sans markdown, sans backticks) :
+{"prospect_score":"hot"|"warm"|"cold","score_reason":"Explication courte","should_create_visit":true|false,"suggested_visit":{"type":"visit"|"contre-visite"|"signature","lead_name":"Nom","lead_phone":"Tel ou null","lead_notes":"Résumé besoins","suggested_date":"YYYY-MM-DD ou null","address":"Adresse ou null"},"schedule_change":{"detected":false,"new_date":"YYYY-MM-DD ou null","new_time":"HH:MM ou null","reason":"ou null"},"needs_identified":{"budget":"ou null","property_type":"ou null","location":"ou null","family_size":"ou null","special_requirements":"ou null"},"next_action":"Recommandation concrète","summary":"Résumé 2-3 phrases"}`;
 
 /* ── Types ── */
 export interface ChatMessage {
@@ -74,6 +206,12 @@ export interface ConversationAnalysis {
     suggested_date: string | null;
     address: string | null;
   } | null;
+  schedule_change?: {
+    detected: boolean;
+    new_date: string | null;
+    new_time: string | null;
+    reason: string | null;
+  };
   needs_identified: Record<string, string | null>;
   next_action: string;
   summary: string;
@@ -86,6 +224,14 @@ export interface RelanceMessages {
   sms: string;
 }
 
+export interface ScanResult {
+  conversationId: string;
+  prospectName: string;
+  analysis: ConversationAnalysis;
+  visitCreated: boolean;
+  visitUpdated: boolean;
+}
+
 /* ──────────────────────────────────────────
    Helper: call Gemini API directly
    ────────────────────────────────────────── */
@@ -95,6 +241,10 @@ async function callGemini(
   contents: Array<{ role: string; parts: Array<{ text: string }> }>,
   maxTokens = 1024,
 ): Promise<{ text: string; tokensUsed: number }> {
+  if (!GEMINI_API_KEY) {
+    throw new Error('Clé API Gemini non configurée. Ajoutez VITE_GEMINI_API_KEY dans votre fichier .env');
+  }
+
   const res = await fetch(
     `${GEMINI_BASE}/${model}:generateContent?key=${GEMINI_API_KEY}`,
     {
@@ -110,7 +260,7 @@ async function callGemini(
 
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`Gemini API erreur (${res.status}): ${errText.slice(0, 200)}`);
+    throw new Error(`Erreur de l'API Gemini (${res.status}): ${errText.slice(0, 200)}`);
   }
 
   const data = await res.json();
@@ -120,6 +270,21 @@ async function callGemini(
     (data.usageMetadata?.candidatesTokenCount || 0);
 
   return { text, tokensUsed };
+}
+
+/* ──────────────────────────────────────────
+   Helper: parse JSON from Gemini response
+   ────────────────────────────────────────── */
+function parseGeminiJSON<T>(rawText: string, fallback: T): T {
+  try {
+    const cleaned = rawText
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim();
+    return JSON.parse(cleaned);
+  } catch {
+    return fallback;
+  }
 }
 
 /* ──────────────────────────────────────────
@@ -137,9 +302,58 @@ async function saveToHistory(userId: string, userMsg: string, assistantMsg: stri
 }
 
 /* ──────────────────────────────────────────
-   Chat — Envoyer un message à ARIA
-   Appelle Gemini directement (pas d'Edge Function)
+   Helper: build rich context for ARIA
    ────────────────────────────────────────── */
+async function buildAgentContext(userId: string, agentName: string): Promise<string> {
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const parts: string[] = [];
+
+  parts.push(`[CONTEXTE: ${now.toLocaleString('fr-FR', { timeZone: 'Africa/Conakry' })} — Agent: ${agentName}]`);
+
+  // Fetch today's visits
+  try {
+    const { data: visits } = await supabase
+      .from('visits')
+      .select('lead_name, type, status, scheduled_at, ai_prospect_score')
+      .gte('scheduled_at', `${todayStr}T00:00:00`)
+      .lte('scheduled_at', `${todayStr}T23:59:59`)
+      .neq('status', 'cancelled')
+      .order('scheduled_at');
+
+    if (visits?.length) {
+      parts.push(`[AGENDA DU JOUR: ${visits.map(v =>
+        `${new Date(v.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} ${v.lead_name} (${v.type}, ${v.status}${v.ai_prospect_score !== 'unknown' ? `, ${v.ai_prospect_score}` : ''})`
+      ).join(' | ')}]`);
+    } else {
+      parts.push('[AGENDA DU JOUR: Aucune visite prévue]');
+    }
+  } catch {
+    // Tables not ready
+  }
+
+  // Fetch pending visits count
+  try {
+    const { data: pending } = await supabase
+      .from('visits')
+      .select('id')
+      .eq('status', 'pending')
+      .gte('scheduled_at', now.toISOString());
+
+    if (pending?.length) {
+      parts.push(`[ALERTES: ${pending.length} visite(s) en attente de confirmation]`);
+    }
+  } catch {
+    // Tables not ready
+  }
+
+  return '\n\n' + parts.join('\n');
+}
+
+/* ══════════════════════════════════════════════════════
+   Chat — Envoyer un message à ARIA
+   Appelle Gemini directement avec contexte enrichi
+   ══════════════════════════════════════════════════════ */
 export async function sendMessageToAria(
   message: string,
   useAdvancedModel = false,
@@ -149,6 +363,7 @@ export async function sendMessageToAria(
     if (!user) return { data: null, error: new Error('Non authentifié — veuillez vous reconnecter.') };
 
     const model = useAdvancedModel ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+    const agentName = user.user_metadata?.full_name || user.email || 'Agent';
 
     // Load recent history for context (last 10 messages)
     let historyContents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
@@ -170,10 +385,8 @@ export async function sendMessageToAria(
       // Tables not ready — continue without history
     }
 
-    // Build context
-    const now = new Date().toLocaleString('fr-FR', { timeZone: 'Africa/Conakry' });
-    const agentName = user.user_metadata?.full_name || user.email || 'Agent';
-    const contextSuffix = `\n\n[CONTEXTE: ${now} — Agent: ${agentName}]`;
+    // Build rich context
+    const contextSuffix = await buildAgentContext(user.id, agentName);
 
     // Build contents
     const contents = [
@@ -250,43 +463,167 @@ export async function clearChatHistory(): Promise<{ error: Error | null }> {
   }
 }
 
-/* ──────────────────────────────────────────
+/* ══════════════════════════════════════════════════════
    Relance IA — Générer un message multi-canal
-   (Edge Function — pour quand elle sera déployée)
-   ────────────────────────────────────────── */
+   Edge Function avec fallback client-side Gemini direct
+   ══════════════════════════════════════════════════════ */
 export async function generateSmartRelance(visitId: string): Promise<{
   data: { messages: RelanceMessages; visit: { lead_name: string; lead_phone: string; lead_email: string } } | null;
   error: Error | null;
 }> {
+  // Try Edge Function first
   try {
     const { data, error } = await supabase.functions.invoke('ai-smart-relance', { body: { visitId } });
-    if (error) return { data: null, error: new Error(error.message) };
-    return { data, error: null };
+    if (!error && data) return { data, error: null };
   } catch {
-    return { data: null, error: new Error('Fonction relance non disponible') };
+    // Edge function not deployed — fallback to client-side
+  }
+
+  // Fallback: call Gemini directly from client
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: null, error: new Error('Non authentifié') };
+
+    // Fetch visit data
+    const { data: visit, error: vError } = await supabase
+      .from('visits')
+      .select('*, property:property_id(title, type, city, address)')
+      .eq('id', visitId)
+      .single();
+
+    if (vError || !visit) return { data: null, error: new Error('Visite non trouvée') };
+
+    const agentName = user.user_metadata?.full_name || user.email || 'Agent';
+    const visitContext = `Informations de la visite :
+- Prospect : ${visit.lead_name}
+- Téléphone : ${visit.lead_phone || 'non renseigné'}
+- Type : ${visit.type === 'visit' ? 'Visite' : visit.type === 'contre-visite' ? 'Contre-visite' : visit.type === 'signature' ? 'Signature' : 'État des lieux'}
+- Statut : ${visit.status === 'pending' ? 'En attente' : visit.status}
+- Date prévue : ${new Date(visit.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+- Bien : ${visit.property?.title || 'Non spécifié'} à ${visit.property?.city || visit.address || 'Conakry'}
+- Notes : ${visit.lead_notes || 'Aucune'}
+- Agent : ${agentName}
+- Dernière relance : ${visit.relance_sent_at ? new Date(visit.relance_sent_at).toLocaleDateString('fr-FR') : 'Jamais'}`;
+
+    const { text: rawText } = await callGemini(
+      'gemini-2.5-flash',
+      RELANCE_PROMPT,
+      [{ role: 'user', parts: [{ text: visitContext }] }],
+      512,
+    );
+
+    const fallbackMessages: RelanceMessages = {
+      whatsapp: `Bonjour ${visit.lead_name}, c'est ${agentName} de Guin-e Immobilier. Je souhaitais confirmer notre rendez-vous. Êtes-vous toujours disponible ? Merci !`,
+      email_subject: `Confirmation de votre visite - ${visit.property?.title || 'Bien immobilier'}`,
+      email_body: `Bonjour ${visit.lead_name},\n\nJe me permets de revenir vers vous concernant notre rendez-vous.\nÊtes-vous toujours disponible ?\n\nCordialement,\n${agentName}`,
+      sms: `${visit.lead_name}, confirmez-vous notre RDV ? ${agentName} - Guin-e Immobilier`,
+    };
+
+    const messages = parseGeminiJSON<RelanceMessages>(rawText, fallbackMessages);
+
+    // Mark relance as sent
+    await supabase
+      .from('visits')
+      .update({ relance_sent_at: new Date().toISOString(), follow_up_required: false, updated_at: new Date().toISOString() })
+      .eq('id', visitId);
+
+    return {
+      data: {
+        messages,
+        visit: {
+          lead_name: visit.lead_name,
+          lead_phone: visit.lead_phone || '',
+          lead_email: visit.lead_email || '',
+        },
+      },
+      error: null,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Erreur génération relance';
+    return { data: null, error: new Error(msg) };
   }
 }
 
-/* ──────────────────────────────────────────
-   Analyse — Analyser une conversation
-   ────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════
+   Analyse — Analyser une conversation (client-side)
+   Edge Function avec fallback Gemini direct
+   ══════════════════════════════════════════════════════ */
 export async function analyzeConversation(conversationId: string): Promise<{
   data: { analysis: ConversationAnalysis; prospectName: string; tokensUsed: number } | null;
   error: Error | null;
 }> {
+  // Try Edge Function first
   try {
     const { data, error } = await supabase.functions.invoke('ai-analyze-conversation', { body: { conversationId } });
-    if (error) return { data: null, error: new Error(error.message) };
-    return { data, error: null };
+    if (!error && data) return { data, error: null };
   } catch {
-    return { data: null, error: new Error('Fonction analyse non disponible') };
+    // Edge function not deployed — fallback
+  }
+
+  // Fallback: call Gemini directly
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: null, error: new Error('Non authentifié') };
+
+    // Fetch messages
+    const { data: messages } = await supabase
+      .from('messages')
+      .select('sender_id, content, created_at')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true })
+      .limit(50);
+
+    if (!messages?.length) return { data: null, error: new Error('Aucun message dans cette conversation') };
+
+    // Get participant names
+    const { data: participants } = await supabase
+      .from('conversation_participants')
+      .select('user_id')
+      .eq('conversation_id', conversationId);
+
+    const otherUserId = participants?.find(p => p.user_id !== user.id)?.user_id;
+    let prospectName = 'Prospect';
+    if (otherUserId) {
+      const { data: pp } = await supabase.from('profiles').select('full_name').eq('id', otherUserId).single();
+      prospectName = pp?.full_name || 'Prospect';
+    }
+
+    const agentName = user.user_metadata?.full_name || user.email || 'Agent';
+    const conversationText = messages.map(m => {
+      const role = m.sender_id === user.id ? `Agent (${agentName})` : `Prospect (${prospectName})`;
+      return `[${new Date(m.created_at).toLocaleString('fr-FR')}] ${role}: ${m.content}`;
+    }).join('\n');
+
+    const { text: rawText, tokensUsed } = await callGemini(
+      'gemini-2.5-pro',
+      CONVERSATION_SCAN_PROMPT,
+      [{ role: 'user', parts: [{ text: `Analyse cette conversation :\n\n${conversationText}` }] }],
+      1024,
+    );
+
+    const fallbackAnalysis: ConversationAnalysis = {
+      prospect_score: 'cold',
+      score_reason: 'Analyse automatique non disponible',
+      should_create_visit: false,
+      suggested_visit: null,
+      needs_identified: {},
+      next_action: 'Relancer manuellement',
+      summary: 'Analyse non disponible.',
+    };
+
+    const analysis = parseGeminiJSON<ConversationAnalysis>(rawText, fallbackAnalysis);
+
+    return { data: { analysis, prospectName, tokensUsed }, error: null };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Erreur analyse conversation';
+    return { data: null, error: new Error(msg) };
   }
 }
 
-/* ──────────────────────────────────────────
-   Rapport — Générer le rapport quotidien
-   Appelle Gemini directement
-   ────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════
+   Rapport — Générer le rapport quotidien (enrichi)
+   Tire les données de la veille, semaine, prospects chauds
+   ══════════════════════════════════════════════════════ */
 export async function generateDailyReport(): Promise<{
   data: { report: string; tokensUsed: number; stats: Record<string, number> } | null;
   error: Error | null;
@@ -298,32 +635,59 @@ export async function generateDailyReport(): Promise<{
     const agentName = user.user_metadata?.full_name || user.email || 'Agent';
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const weekAgo = new Date(now);
+    weekAgo.setDate(weekAgo.getDate() - 7);
 
-    // Try to fetch visit stats
-    let visitsContext = 'Aucune donnée de visites disponible.';
-    try {
-      const { data: visits } = await supabase
+    // Fetch all data in parallel
+    const [todayVisitsRes, yesterdayVisitsRes, weekVisitsRes, hotProspectsRes] = await Promise.all([
+      supabase
         .from('visits')
-        .select('lead_name, type, status, scheduled_at')
+        .select('lead_name, lead_phone, type, status, scheduled_at, address, ai_prospect_score, lead_notes, property:property_id(title, city)')
         .gte('scheduled_at', `${todayStr}T00:00:00`)
         .lte('scheduled_at', `${todayStr}T23:59:59`)
         .neq('status', 'cancelled')
-        .order('scheduled_at');
+        .order('scheduled_at'),
+      supabase
+        .from('visits')
+        .select('lead_name, type, status, ai_prospect_score')
+        .gte('scheduled_at', `${yesterdayStr}T00:00:00`)
+        .lte('scheduled_at', `${yesterdayStr}T23:59:59`),
+      supabase
+        .from('visits')
+        .select('status, type, relance_sent_at')
+        .gte('scheduled_at', weekAgo.toISOString()),
+      supabase
+        .from('visits')
+        .select('lead_name, lead_phone, type, status, scheduled_at, ai_prospect_score')
+        .eq('ai_prospect_score', 'hot')
+        .in('status', ['confirmed', 'pending'])
+        .gte('scheduled_at', now.toISOString())
+        .order('scheduled_at')
+        .limit(5),
+    ]);
 
-      if (visits?.length) {
-        visitsContext = `Visites aujourd'hui: ${visits.map(v =>
-          `${new Date(v.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}: ${v.lead_name} (${v.type}, ${v.status})`
-        ).join(' | ')}`;
-      } else {
-        visitsContext = 'Aucune visite prévue aujourd\'hui.';
-      }
-    } catch {
-      // Tables not ready
-    }
+    const todayVisits = todayVisitsRes.data || [];
+    const yesterdayVisits = yesterdayVisitsRes.data || [];
+    const weekVisits = weekVisitsRes.data || [];
+    const hotProspects = hotProspectsRes.data || [];
 
-    const reportContext = `Agent: ${agentName}
-Date: ${now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-${visitsContext}`;
+    // Compute stats
+    const weekCompleted = weekVisits.filter(v => v.status === 'completed').length;
+    const weekSignatures = weekVisits.filter(v => v.type === 'signature' && v.status === 'completed').length;
+    const weekRelanced = weekVisits.filter(v => v.relance_sent_at).length;
+    const weekTotal = weekVisits.length;
+    const conversionRate = weekTotal > 0 ? Math.round((weekSignatures / weekTotal) * 100) : 0;
+
+    const reportContext = `Données agent "${agentName}" au ${now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} :
+
+VISITES HIER: ${yesterdayVisits.length > 0 ? yesterdayVisits.map(v => `${v.lead_name} (${v.type}) → ${v.status}`).join(', ') : 'Aucune'}
+VISITES AUJOURD'HUI: ${todayVisits.length > 0 ? todayVisits.map(v => `${new Date(v.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}: ${v.lead_name} (${v.type}, ${v.status}) — ${v.property?.title || 'Bien'} à ${v.property?.city || v.address || 'Conakry'}`).join(' | ') : 'Aucune'}
+STATS SEMAINE: ${weekTotal} visites, ${weekCompleted} terminées, ${weekSignatures} signatures, ${weekRelanced} relances, ${conversionRate}% conversion
+PROSPECTS CHAUDS: ${hotProspects.length > 0 ? hotProspects.map(v => `🔥 ${v.lead_name} (${v.type})`).join(', ') : 'Aucun'}
+EN ATTENTE: ${todayVisits.filter(v => v.status === 'pending').length} visite(s) à confirmer`;
 
     const { text: report, tokensUsed } = await callGemini(
       'gemini-2.5-pro',
@@ -336,12 +700,177 @@ ${visitsContext}`;
     saveToHistory(user.id, '[RAPPORT QUOTIDIEN]', report, 'gemini-2.5-pro', tokensUsed);
 
     return {
-      data: { report, tokensUsed, stats: {} },
+      data: {
+        report,
+        tokensUsed,
+        stats: { weekTotal, weekCompleted, weekSignatures, conversionRate },
+      },
       error: null,
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Erreur génération rapport';
     return { data: null, error: new Error(msg) };
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   Scan IA — Analyser les conversations et auto-créer/
+   mettre à jour les visites dans l'agenda
+   ══════════════════════════════════════════════════════ */
+export async function scanConversationsForVisits(): Promise<{
+  data: ScanResult[];
+  error: Error | null;
+}> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: [], error: new Error('Non authentifié') };
+
+    // Get conversations where the agent is a participant
+    const { data: participations } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('user_id', user.id);
+
+    if (!participations?.length) return { data: [], error: null };
+
+    const conversationIds = participations.map(p => p.conversation_id);
+    const results: ScanResult[] = [];
+
+    // Analyze each conversation (limit to 5 most recent active ones)
+    for (const convId of conversationIds.slice(0, 5)) {
+      // Check if this conversation has recent messages (last 48h)
+      const cutoff = new Date();
+      cutoff.setHours(cutoff.getHours() - 48);
+
+      const { data: recentMsgs } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', convId)
+        .gte('created_at', cutoff.toISOString())
+        .limit(1);
+
+      if (!recentMsgs?.length) continue;
+
+      // Analyze the conversation
+      const { data: analysisData, error: analysisError } = await analyzeConversation(convId);
+      if (analysisError || !analysisData) continue;
+
+      const { analysis, prospectName } = analysisData;
+      let visitCreated = false;
+      let visitUpdated = false;
+
+      // Auto-create visit if recommended
+      if (analysis.should_create_visit && analysis.suggested_visit) {
+        const sv = analysis.suggested_visit;
+
+        // Check if a similar visit doesn't already exist
+        const { data: existing } = await supabase
+          .from('visits')
+          .select('id')
+          .eq('lead_name', sv.lead_name)
+          .in('status', ['confirmed', 'pending'])
+          .gte('scheduled_at', new Date().toISOString())
+          .limit(1);
+
+        if (!existing?.length) {
+          const scheduledAt = sv.suggested_date
+            ? new Date(`${sv.suggested_date}T10:00:00`).toISOString()
+            : new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(); // +2 days default
+
+          await supabase.from('visits').insert({
+            agent_id: user.id,
+            lead_name: sv.lead_name || prospectName,
+            lead_phone: sv.lead_phone || null,
+            lead_notes: sv.lead_notes || analysis.summary,
+            type: (sv.type as 'visit' | 'contre-visite' | 'signature' | 'etat-lieux') || 'visit',
+            status: 'pending',
+            scheduled_at: scheduledAt,
+            duration_minutes: 60,
+            address: sv.address || null,
+            ai_prospect_score: analysis.prospect_score,
+            ai_suggested: true,
+          });
+
+          visitCreated = true;
+        }
+      }
+
+      // Update prospect score on existing visits for this prospect
+      if (analysis.prospect_score) {
+        const { data: existingVisits } = await supabase
+          .from('visits')
+          .select('id')
+          .ilike('lead_name', `%${prospectName}%`)
+          .in('status', ['confirmed', 'pending'])
+          .gte('scheduled_at', new Date().toISOString());
+
+        if (existingVisits?.length) {
+          for (const v of existingVisits) {
+            await supabase.from('visits').update({
+              ai_prospect_score: analysis.prospect_score,
+              updated_at: new Date().toISOString(),
+            }).eq('id', v.id);
+          }
+          visitUpdated = true;
+        }
+      }
+
+      // Handle schedule changes
+      if (analysis.schedule_change?.detected && analysis.schedule_change.new_date) {
+        const { data: matchingVisits } = await supabase
+          .from('visits')
+          .select('id')
+          .ilike('lead_name', `%${prospectName}%`)
+          .in('status', ['confirmed', 'pending'])
+          .gte('scheduled_at', new Date().toISOString())
+          .order('scheduled_at', { ascending: true })
+          .limit(1);
+
+        if (matchingVisits?.length) {
+          const newDateTime = analysis.schedule_change.new_time
+            ? `${analysis.schedule_change.new_date}T${analysis.schedule_change.new_time}:00`
+            : `${analysis.schedule_change.new_date}T10:00:00`;
+
+          await supabase.from('visits').update({
+            scheduled_at: new Date(newDateTime).toISOString(),
+            agent_notes: `[ARIA] Horaire mis à jour suite à conversation : ${analysis.schedule_change.reason || ''}`,
+            updated_at: new Date().toISOString(),
+          }).eq('id', matchingVisits[0].id);
+
+          visitUpdated = true;
+        }
+      }
+
+      results.push({
+        conversationId: convId,
+        prospectName,
+        analysis,
+        visitCreated,
+        visitUpdated,
+      });
+    }
+
+    // Save scan results summary to AI history
+    if (results.length > 0) {
+      const created = results.filter(r => r.visitCreated).length;
+      const updated = results.filter(r => r.visitUpdated).length;
+      const hot = results.filter(r => r.analysis.prospect_score === 'hot').length;
+
+      const summary = `📡 **Scan IA terminé**
+${results.length} conversation(s) analysée(s)
+${created > 0 ? `✅ ${created} visite(s) créée(s) automatiquement` : ''}
+${updated > 0 ? `🔄 ${updated} visite(s) mise(s) à jour` : ''}
+${hot > 0 ? `🔥 ${hot} prospect(s) chaud(s) détecté(s)` : ''}
+
+${results.map(r => `• ${r.prospectName}: ${r.analysis.prospect_score === 'hot' ? '🔥' : r.analysis.prospect_score === 'warm' ? '🟡' : '❄️'} ${r.analysis.score_reason}`).join('\n')}`;
+
+      saveToHistory(user.id, '[SCAN IA CONVERSATIONS]', summary, 'gemini-2.5-pro', 0);
+    }
+
+    return { data: results, error: null };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Erreur scan IA';
+    return { data: [], error: new Error(msg) };
   }
 }
 
