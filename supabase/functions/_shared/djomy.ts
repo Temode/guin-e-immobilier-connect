@@ -68,7 +68,7 @@ export async function getDjomyAuthToken(): Promise<string> {
     headers: {
       'Content-Type': 'application/json',
       'X-API-KEY': apiKey,
-      'X-PATNER-DOMAIN': DJOMY_PARTNER_DOMAIN_KEY,
+      'X-PARTNER-DOMAIN': DJOMY_PARTNER_DOMAIN_KEY,
     },
     body: JSON.stringify({}),
   });
@@ -123,7 +123,7 @@ export async function initiateDjomyPayment(params: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${params.token}`,
       'X-API-KEY': apiKey,
-      'X-PATNER-DOMAIN': DJOMY_PARTNER_DOMAIN_KEY,
+      'X-PARTNER-DOMAIN': DJOMY_PARTNER_DOMAIN_KEY,
     },
     body: JSON.stringify(body),
   });
@@ -157,7 +157,7 @@ export async function checkDjomyPaymentStatus(params: {
     headers: {
       'Authorization': `Bearer ${params.token}`,
       'X-API-KEY': apiKey,
-      'X-PATNER-DOMAIN': DJOMY_PARTNER_DOMAIN_KEY,
+      'X-PARTNER-DOMAIN': DJOMY_PARTNER_DOMAIN_KEY,
     },
   });
 
