@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 /* ── Gemini API config ── */
-const GEMINI_API_KEY = 'AIzaSyBTmRf0mdaqBpywqAMmuBnfXBlFHXtILhk';
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 const SYSTEM_PROMPT = `Tu es ARIA, l'assistante IA intelligente et proactive de la plateforme Guin-e Immobilier.
