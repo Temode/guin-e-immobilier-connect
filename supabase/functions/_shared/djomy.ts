@@ -5,6 +5,7 @@
 
 const DJOMY_SANDBOX_URL = 'https://sandbox-api.djomy.africa';
 const DJOMY_PROD_URL = 'https://api.djomy.africa';
+const DJOMY_PARTNER_DOMAIN_KEY = 'dcaa27935b4920eb5e7c2c9a1d35a5040493b177bed92d9b69966c46eca6a627';
 
 function getDjomyBaseUrl(): string {
   const env = Deno.env.get('DJOMY_ENV') || 'sandbox';
@@ -65,6 +66,7 @@ export async function getDjomyAuthToken(): Promise<string> {
     headers: {
       'Content-Type': 'application/json',
       'X-API-KEY': apiKey,
+      'X-PATNER-DOMAIN': DJOMY_PARTNER_DOMAIN_KEY,
     },
     body: JSON.stringify({}),
   });
@@ -119,6 +121,7 @@ export async function initiateDjomyPayment(params: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${params.token}`,
       'X-API-KEY': apiKey,
+      'X-PATNER-DOMAIN': DJOMY_PARTNER_DOMAIN_KEY,
     },
     body: JSON.stringify(body),
   });
@@ -152,6 +155,7 @@ export async function checkDjomyPaymentStatus(params: {
     headers: {
       'Authorization': `Bearer ${params.token}`,
       'X-API-KEY': apiKey,
+      'X-PATNER-DOMAIN': DJOMY_PARTNER_DOMAIN_KEY,
     },
   });
 
