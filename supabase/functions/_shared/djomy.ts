@@ -61,6 +61,8 @@ export async function getDjomyAuthToken(): Promise<string> {
   const clientSecret = getClientSecret();
   const apiKey = await generateApiKey();
 
+  console.log(`[DJOMY] Auth attempt: baseUrl=${baseUrl}, clientId=${clientId}, apiKeyPrefix=${apiKey.substring(0, 20)}...`);
+
   const res = await fetch(`${baseUrl}/v1/auth`, {
     method: 'POST',
     headers: {
