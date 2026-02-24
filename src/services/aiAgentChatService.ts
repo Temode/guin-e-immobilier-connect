@@ -1,8 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
 
-/* ── Gemini API config ── */
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
-const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+/* ── Claude API config ── */
+const CLAUDE_API_KEY = import.meta.env.VITE_CLAUDE_API_KEY || '';
+const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
+const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
 
 /* ══════════════════════════════════════════
    SYSTEM PROMPT — Formation complète d'ARIA
@@ -15,7 +16,7 @@ IDENTITÉ & PERSONNALITÉ
 ═══════════════════════════════════════
 - Nom : ARIA (Assistant en Recherche Immobilière et Analyse)
 - Plateforme : Guin-e Immobilier Connect — SaaS immobilier pour la Guinée
-- Moteur IA : Google Gemini (Flash pour les réponses rapides, Pro pour les analyses stratégiques)
+- Moteur IA : Claude (Sonnet pour les réponses rapides, Réflexion approfondie pour les analyses stratégiques)
 - Tu es chaleureuse, professionnelle, directe et orientée action
 - Tu tutoies l'agent (c'est ton collègue proche) mais vouvoies les prospects dans les messages générés
 - Tu utilises des emojis avec modération pour rendre tes réponses lisibles
@@ -233,49 +234,72 @@ export interface ScanResult {
 }
 
 /* ──────────────────────────────────────────
-   Helper: call Gemini API directly
+   Helper: call Claude API (Anthropic Messages)
+   Supports extended thinking for advanced mode
    ────────────────────────────────────────── */
-async function callGemini(
-  model: string,
+async function callClaude(
   systemPrompt: string,
-  contents: Array<{ role: string; parts: Array<{ text: string }> }>,
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
   maxTokens = 1024,
+  useExtendedThinking = false,
 ): Promise<{ text: string; tokensUsed: number }> {
-  if (!GEMINI_API_KEY) {
-    throw new Error('Clé API Gemini non configurée. Ajoutez VITE_GEMINI_API_KEY dans votre fichier .env');
+  if (!CLAUDE_API_KEY) {
+    throw new Error('Clé API Claude non configurée. Ajoutez VITE_CLAUDE_API_KEY dans votre fichier .env');
   }
 
-  const res = await fetch(
-    `${GEMINI_BASE}/${model}:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents,
-        generationConfig: { maxOutputTokens: maxTokens },
-      }),
+  const body: Record<string, unknown> = {
+    model: CLAUDE_MODEL,
+    max_tokens: useExtendedThinking ? maxTokens + 10000 : maxTokens,
+    system: systemPrompt,
+    messages,
+  };
+
+  // Extended thinking for advanced/strategic mode
+  if (useExtendedThinking) {
+    body.thinking = {
+      type: 'enabled',
+      budget_tokens: 10000,
+    };
+  }
+
+  const res = await fetch(CLAUDE_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': CLAUDE_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
     },
-  );
+    body: JSON.stringify(body),
+  });
 
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`Erreur de l'API Gemini (${res.status}): ${errText.slice(0, 200)}`);
+    throw new Error(`Erreur de l'API Claude (${res.status}): ${errText.slice(0, 300)}`);
   }
 
   const data = await res.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+  // Extract text from response content blocks (skip thinking blocks)
+  let text = '';
+  if (Array.isArray(data.content)) {
+    for (const block of data.content) {
+      if (block.type === 'text') {
+        text += block.text;
+      }
+    }
+  }
+
   const tokensUsed =
-    (data.usageMetadata?.promptTokenCount || 0) +
-    (data.usageMetadata?.candidatesTokenCount || 0);
+    (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0);
 
   return { text, tokensUsed };
 }
 
 /* ──────────────────────────────────────────
-   Helper: parse JSON from Gemini response
+   Helper: parse JSON from Claude response
    ────────────────────────────────────────── */
-function parseGeminiJSON<T>(rawText: string, fallback: T): T {
+function parseClaudeJSON<T>(rawText: string, fallback: T): T {
   try {
     const cleaned = rawText
       .replace(/```json\n?/g, '')
@@ -352,7 +376,9 @@ async function buildAgentContext(userId: string, agentName: string): Promise<str
 
 /* ══════════════════════════════════════════════════════
    Chat — Envoyer un message à ARIA
-   Appelle Gemini directement avec contexte enrichi
+   Appelle Claude API avec contexte enrichi
+   Mode standard : Claude Sonnet
+   Mode avancé : Claude Sonnet + Extended Thinking
    ══════════════════════════════════════════════════════ */
 export async function sendMessageToAria(
   message: string,
@@ -362,11 +388,11 @@ export async function sendMessageToAria(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: null, error: new Error('Non authentifié — veuillez vous reconnecter.') };
 
-    const model = useAdvancedModel ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+    const modelLabel = useAdvancedModel ? 'claude-sonnet-thinking' : 'claude-sonnet';
     const agentName = user.user_metadata?.full_name || user.email || 'Agent';
 
     // Load recent history for context (last 10 messages)
-    let historyContents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+    let historyMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
     try {
       const { data: history } = await supabase
         .from('ai_conversations')
@@ -376,9 +402,9 @@ export async function sendMessageToAria(
         .limit(10);
 
       if (history) {
-        historyContents = history.reverse().map((m) => ({
-          role: m.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: m.content }],
+        historyMessages = history.reverse().map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
         }));
       }
     } catch {
@@ -388,17 +414,17 @@ export async function sendMessageToAria(
     // Build rich context
     const contextSuffix = await buildAgentContext(user.id, agentName);
 
-    // Build contents
-    const contents = [
-      ...historyContents,
-      { role: 'user', parts: [{ text: message }] },
+    // Build messages array for Claude
+    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
+      ...historyMessages,
+      { role: 'user', content: message },
     ];
 
-    const { text: assistantMessage, tokensUsed } = await callGemini(
-      model,
+    const { text: assistantMessage, tokensUsed } = await callClaude(
       SYSTEM_PROMPT + contextSuffix,
-      contents,
+      messages,
       1024,
+      useAdvancedModel,
     );
 
     if (!assistantMessage) {
@@ -406,10 +432,10 @@ export async function sendMessageToAria(
     }
 
     // Save to DB (non-blocking)
-    saveToHistory(user.id, message, assistantMessage, model, tokensUsed);
+    saveToHistory(user.id, message, assistantMessage, modelLabel, tokensUsed);
 
     return {
-      data: { message: assistantMessage, model, tokensUsed },
+      data: { message: assistantMessage, model: modelLabel, tokensUsed },
       error: null,
     };
   } catch (err) {
@@ -465,7 +491,7 @@ export async function clearChatHistory(): Promise<{ error: Error | null }> {
 
 /* ══════════════════════════════════════════════════════
    Relance IA — Générer un message multi-canal
-   Edge Function avec fallback client-side Gemini direct
+   Edge Function avec fallback client-side Claude direct
    ══════════════════════════════════════════════════════ */
 export async function generateSmartRelance(visitId: string): Promise<{
   data: { messages: RelanceMessages; visit: { lead_name: string; lead_phone: string; lead_email: string } } | null;
@@ -479,7 +505,7 @@ export async function generateSmartRelance(visitId: string): Promise<{
     // Edge function not deployed — fallback to client-side
   }
 
-  // Fallback: call Gemini directly from client
+  // Fallback: call Claude directly from client
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: null, error: new Error('Non authentifié') };
@@ -505,10 +531,9 @@ export async function generateSmartRelance(visitId: string): Promise<{
 - Agent : ${agentName}
 - Dernière relance : ${visit.relance_sent_at ? new Date(visit.relance_sent_at).toLocaleDateString('fr-FR') : 'Jamais'}`;
 
-    const { text: rawText } = await callGemini(
-      'gemini-2.5-flash',
+    const { text: rawText } = await callClaude(
       RELANCE_PROMPT,
-      [{ role: 'user', parts: [{ text: visitContext }] }],
+      [{ role: 'user', content: visitContext }],
       512,
     );
 
@@ -519,7 +544,7 @@ export async function generateSmartRelance(visitId: string): Promise<{
       sms: `${visit.lead_name}, confirmez-vous notre RDV ? ${agentName} - Guin-e Immobilier`,
     };
 
-    const messages = parseGeminiJSON<RelanceMessages>(rawText, fallbackMessages);
+    const messages = parseClaudeJSON<RelanceMessages>(rawText, fallbackMessages);
 
     // Mark relance as sent
     await supabase
@@ -546,7 +571,7 @@ export async function generateSmartRelance(visitId: string): Promise<{
 
 /* ══════════════════════════════════════════════════════
    Analyse — Analyser une conversation (client-side)
-   Edge Function avec fallback Gemini direct
+   Edge Function avec fallback Claude direct
    ══════════════════════════════════════════════════════ */
 export async function analyzeConversation(conversationId: string): Promise<{
   data: { analysis: ConversationAnalysis; prospectName: string; tokensUsed: number } | null;
@@ -560,7 +585,7 @@ export async function analyzeConversation(conversationId: string): Promise<{
     // Edge function not deployed — fallback
   }
 
-  // Fallback: call Gemini directly
+  // Fallback: call Claude directly with extended thinking for deep analysis
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: null, error: new Error('Non authentifié') };
@@ -594,11 +619,11 @@ export async function analyzeConversation(conversationId: string): Promise<{
       return `[${new Date(m.created_at).toLocaleString('fr-FR')}] ${role}: ${m.content}`;
     }).join('\n');
 
-    const { text: rawText, tokensUsed } = await callGemini(
-      'gemini-2.5-pro',
+    const { text: rawText, tokensUsed } = await callClaude(
       CONVERSATION_SCAN_PROMPT,
-      [{ role: 'user', parts: [{ text: `Analyse cette conversation :\n\n${conversationText}` }] }],
+      [{ role: 'user', content: `Analyse cette conversation :\n\n${conversationText}` }],
       1024,
+      true, // Use extended thinking for deep analysis
     );
 
     const fallbackAnalysis: ConversationAnalysis = {
@@ -611,7 +636,7 @@ export async function analyzeConversation(conversationId: string): Promise<{
       summary: 'Analyse non disponible.',
     };
 
-    const analysis = parseGeminiJSON<ConversationAnalysis>(rawText, fallbackAnalysis);
+    const analysis = parseClaudeJSON<ConversationAnalysis>(rawText, fallbackAnalysis);
 
     return { data: { analysis, prospectName, tokensUsed }, error: null };
   } catch (err) {
@@ -622,7 +647,7 @@ export async function analyzeConversation(conversationId: string): Promise<{
 
 /* ══════════════════════════════════════════════════════
    Rapport — Générer le rapport quotidien (enrichi)
-   Tire les données de la veille, semaine, prospects chauds
+   Utilise extended thinking pour une analyse approfondie
    ══════════════════════════════════════════════════════ */
 export async function generateDailyReport(): Promise<{
   data: { report: string; tokensUsed: number; stats: Record<string, number> } | null;
@@ -689,15 +714,15 @@ STATS SEMAINE: ${weekTotal} visites, ${weekCompleted} terminées, ${weekSignatur
 PROSPECTS CHAUDS: ${hotProspects.length > 0 ? hotProspects.map(v => `🔥 ${v.lead_name} (${v.type})`).join(', ') : 'Aucun'}
 EN ATTENTE: ${todayVisits.filter(v => v.status === 'pending').length} visite(s) à confirmer`;
 
-    const { text: report, tokensUsed } = await callGemini(
-      'gemini-2.5-pro',
+    const { text: report, tokensUsed } = await callClaude(
       REPORT_PROMPT,
-      [{ role: 'user', parts: [{ text: reportContext }] }],
+      [{ role: 'user', content: reportContext }],
       1500,
+      true, // Extended thinking for strategic report
     );
 
     // Save to history
-    saveToHistory(user.id, '[RAPPORT QUOTIDIEN]', report, 'gemini-2.5-pro', tokensUsed);
+    saveToHistory(user.id, '[RAPPORT QUOTIDIEN]', report, 'claude-sonnet-thinking', tokensUsed);
 
     return {
       data: {
@@ -864,7 +889,7 @@ ${hot > 0 ? `🔥 ${hot} prospect(s) chaud(s) détecté(s)` : ''}
 
 ${results.map(r => `• ${r.prospectName}: ${r.analysis.prospect_score === 'hot' ? '🔥' : r.analysis.prospect_score === 'warm' ? '🟡' : '❄️'} ${r.analysis.score_reason}`).join('\n')}`;
 
-      saveToHistory(user.id, '[SCAN IA CONVERSATIONS]', summary, 'gemini-2.5-pro', 0);
+      saveToHistory(user.id, '[SCAN IA CONVERSATIONS]', summary, 'claude-sonnet-thinking', 0);
     }
 
     return { data: results, error: null };

@@ -37,8 +37,8 @@ function fmtTime(isoStr: string): string {
 /* ─── Model label ─── */
 function modelLabel(model: string): string {
   if (!model) return '';
-  if (model.includes('gemini-2.5-pro')) return 'Gemini Pro';
-  if (model.includes('gemini-2.5-flash')) return 'Gemini Flash';
+  if (model.includes('claude-sonnet-thinking')) return 'Claude Sonnet (Thinking)';
+  if (model.includes('claude-sonnet')) return 'Claude Sonnet';
   return model;
 }
 
@@ -155,7 +155,7 @@ export default function AgentIAChat() {
       role: 'assistant',
       content: data.report,
       created_at: new Date().toISOString(),
-      metadata: { model: 'gemini-2.5-pro', tokens_used: data.tokensUsed, type: 'daily_report' },
+      metadata: { model: 'claude-sonnet-thinking', tokens_used: data.tokensUsed, type: 'daily_report' },
     };
 
     setMessages((prev) => {
