@@ -39,6 +39,7 @@ function modelLabel(model: string): string {
   if (!model) return '';
   if (model.includes('claude-sonnet-thinking')) return 'Claude Sonnet (Thinking)';
   if (model.includes('claude-sonnet')) return 'Claude Sonnet';
+  if (model.includes('gemini-flash')) return 'Gemini Flash';
   return model;
 }
 
@@ -241,7 +242,7 @@ export default function AgentIAChat() {
 
   const handleToggleAdvanced = () => {
     if (!useAdvanced && usage?.limit_reached) {
-      setError('Limite de crédits Gemini Pro atteinte ce mois-ci. Utilisez le mode Rapide (Gemini Flash).');
+      setError('Limite de crédits Claude atteinte ce mois-ci. Utilisez le mode Rapide (Gemini Flash).');
       return;
     }
     setUseAdvanced((v) => !v);
@@ -256,14 +257,14 @@ export default function AgentIAChat() {
         <div className={styles.ariaAvatar}>✨</div>
         <div className={styles.ariaInfo}>
           <h1 className={styles.ariaName}>ARIA — Assistante IA</h1>
-          <span className={styles.ariaStatus}>En ligne · Propulsée par Gemini</span>
+          <span className={styles.ariaStatus}>En ligne · Dual AI (Gemini Flash + Claude)</span>
         </div>
 
         {/* Usage counter */}
         {usage && (
           <div
             className={styles.usageCounter}
-            title={`${usage.advanced_used}/${usage.advanced_limit} messages Gemini Pro utilisés ce mois`}
+            title={`${usage.advanced_used}/${usage.advanced_limit} messages Claude avancés utilisés ce mois`}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -286,7 +287,7 @@ export default function AgentIAChat() {
         <button
           className={`${styles.modelToggle} ${useAdvanced ? styles.advanced : ''}`}
           onClick={handleToggleAdvanced}
-          title={useAdvanced ? 'Mode Stratégique (Gemini Pro) — cliquer pour basculer' : 'Mode Rapide (Gemini Flash) — cliquer pour basculer'}
+          title={useAdvanced ? 'Mode Stratégique (Claude Sonnet) — cliquer pour basculer' : 'Mode Rapide (Gemini Flash) — cliquer pour basculer'}
         >
           <SparkleIcon />
           <span>{useAdvanced ? 'Stratégique' : 'Rapide'}</span>
@@ -330,7 +331,7 @@ export default function AgentIAChat() {
             <div className={styles.welcomeIcon}>✨</div>
             <h2>Bonjour {agentName.split(' ')[0]} !</h2>
             <p>
-              Je suis <strong>ARIA</strong>, votre assistante IA dédiée propulsée par Gemini. Je connais votre agenda,
+              Je suis <strong>ARIA</strong>, votre assistante IA dédiée propulsée par Gemini Flash & Claude Sonnet. Je connais votre agenda,
               vos prospects et le marché immobilier guinéen. Comment puis-je vous aider aujourd'hui ?
             </p>
             <div className={styles.welcomeSuggestions}>
@@ -417,7 +418,7 @@ export default function AgentIAChat() {
           </button>
         </div>
         <p className={styles.inputHint}>
-          Mode : {useAdvanced ? '⚡ Stratégique (Gemini Pro)' : '🚀 Rapide (Gemini Flash)'}
+          Mode : {useAdvanced ? '⚡ Stratégique (Claude Sonnet)' : '🚀 Rapide (Gemini Flash)'}
           {usage && ` · ${usage.advanced_used}/${usage.advanced_limit} avancés`}
           {' '}· Maj+Entrée pour saut de ligne
         </p>
