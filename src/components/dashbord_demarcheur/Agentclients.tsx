@@ -61,6 +61,14 @@ const SunIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const StarIcon = ({ className, filled = false }: { className?: string; filled?: boolean }) => (
+  filled ? (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+    </svg>
+  ) : null
+);
+
 const SparklesIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
     <path fillRule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5z" clipRule="evenodd" />
@@ -153,7 +161,7 @@ const ChevronRightIcon = ({ className }: { className?: string }) => (
 );
 
 /* ==========================================
-   HELPERS
+   HELPERS (from Lovable backend)
 ========================================== */
 function getInitials(name: string): string {
   return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '??';
@@ -193,9 +201,9 @@ interface ClientData {
 }
 
 /* ==========================================
-   TOP BAR COMPONENT
+   TOP BAR COMPONENT (design original restauré)
 ========================================== */
-const TopBar = ({ searchQuery, onSearchChange }) => {
+const TopBar = ({ searchQuery, onSearchChange, urgentCount }) => {
   const now = new Date();
   const dateStr = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
@@ -226,6 +234,11 @@ const TopBar = ({ searchQuery, onSearchChange }) => {
         </div>
         <button className={styles.iconBtn}>
           <NotificationIcon />
+          {urgentCount > 0 && <span className={styles.notificationBadge}>{urgentCount}</span>}
+        </button>
+        <button className={`${styles.btn} ${styles.btnPrimary}`}>
+          <UserAddIcon />
+          Ajouter un client
         </button>
       </div>
     </header>
@@ -233,7 +246,7 @@ const TopBar = ({ searchQuery, onSearchChange }) => {
 };
 
 /* ==========================================
-   PAGE HEADER COMPONENT
+   PAGE HEADER COMPONENT (design original restauré)
 ========================================== */
 const PageHeader = ({ totalClients }) => (
   <div className={styles.pageHeader}>
@@ -247,6 +260,10 @@ const PageHeader = ({ totalClients }) => (
       <button className={`${styles.btn} ${styles.btnSecondary}`}>
         <ExportIcon />
         Exporter
+      </button>
+      <button className={`${styles.btn} ${styles.btnPrimary}`}>
+        <UserAddIcon />
+        Ajouter un client
       </button>
     </div>
   </div>
@@ -272,7 +289,7 @@ const StatsGrid = ({ stats }) => (
 );
 
 /* ==========================================
-   ALERT BANNER COMPONENT
+   ALERT BANNER COMPONENT (design original restauré)
 ========================================== */
 const AlertBanner = ({ alert }) => {
   if (!alert) return null;
@@ -285,6 +302,9 @@ const AlertBanner = ({ alert }) => {
         <h3>{alert.title}</h3>
         <p>{alert.description}</p>
       </div>
+      <button className={`${styles.btn} ${styles.btnGold} ${styles.btnSm}`}>
+        Voir les relances
+      </button>
     </div>
   );
 };
@@ -308,11 +328,20 @@ const Tabs = ({ tabs, activeTab, onTabChange }) => (
 );
 
 /* ==========================================
-   FILTERS BAR COMPONENT
+   FILTERS BAR COMPONENT (design original restauré)
 ========================================== */
-const FiltersBar = ({ viewMode, onViewModeChange, sortBy, onSortChange }) => (
+const FiltersBar = ({ viewMode, onViewModeChange, sortBy, onSortChange, searchQuery, onSearchChange }) => (
   <div className={styles.filtersBar}>
     <div className={styles.filtersLeft}>
+      <div className={styles.filterSearch}>
+        <SearchIcon />
+        <input
+          type="text"
+          placeholder="Rechercher par nom, téléphone, email..."
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+        />
+      </div>
       <button className={styles.filterBtn}>
         <CheckCircleIcon />
         Statut
@@ -353,7 +382,7 @@ const FiltersBar = ({ viewMode, onViewModeChange, sortBy, onSortChange }) => (
 );
 
 /* ==========================================
-   CLIENT CARD COMPONENT
+   CLIENT CARD COMPONENT (design original restauré + scoring IA)
 ========================================== */
 const ClientCard = ({ client }) => {
   const statusConfig = {
@@ -365,8 +394,8 @@ const ClientCard = ({ client }) => {
     converted: { label: 'Actif', icon: CheckCircleIcon, className: 'converted' },
     contacted: { label: 'Contacté', icon: MessageIcon, className: 'contacted' },
     hot: { label: '🔥 Prospect chaud', icon: SparklesIcon, className: 'negotiation' },
-    warm: { label: '🟡 Prospect tiède', icon: ClockIcon, className: 'visit' },
-    cold: { label: '❄️ Prospect froid', icon: ClockIcon, className: 'contacted' },
+    warm: { label: '🟡 Prospect tiède', icon: ClockIcon, className: 'qualified' },
+    cold: { label: '❄️ Prospect froid', icon: MessageIcon, className: 'contacted' },
   };
 
   const typeConfig = {
@@ -389,10 +418,12 @@ const ClientCard = ({ client }) => {
             </span>
           </h3>
           <div className={styles.clientContact}>
-            <span>
-              <PhoneIcon />
-              {client.phone || 'Non renseigné'}
-            </span>
+            {client.phone && (
+              <span>
+                <PhoneIcon />
+                {client.phone}
+              </span>
+            )}
             {client.email && (
               <span>
                 <EmailIcon />
@@ -429,6 +460,10 @@ const ClientCard = ({ client }) => {
                 <div className={styles.dropdownItem}>
                   <BuildingIcon />
                   Voir ses biens
+                </div>
+                <div className={styles.dropdownItem}>
+                  <PlusIcon />
+                  Ajouter un bien
                 </div>
               </>
             )}
@@ -478,10 +513,36 @@ const ClientCard = ({ client }) => {
             Appeler
           </button>
         )}
-        <button className={styles.clientAction}>
-          <MessageIcon />
-          Message
-        </button>
+        {client.type === 'prospect' && client.statuses.includes('negotiation') && (
+          <button className={`${styles.clientAction} ${styles.gold}`}>
+            <CheckCircleIcon />
+            Convertir
+          </button>
+        )}
+        {client.type === 'prospect' && (client.statuses.includes('qualified') || client.statuses.includes('hot')) && !client.statuses.includes('negotiation') && (
+          <button className={styles.clientAction}>
+            <CalendarIcon />
+            Planifier
+          </button>
+        )}
+        {client.type === 'prospect' && !client.statuses.includes('negotiation') && !client.statuses.includes('qualified') && !client.statuses.includes('hot') && (
+          <button className={styles.clientAction}>
+            <MessageIcon />
+            Message
+          </button>
+        )}
+        {client.type === 'owner' && (
+          <button className={styles.clientAction}>
+            <BuildingIcon />
+            Ses biens
+          </button>
+        )}
+        {client.type === 'tenant' && (
+          <button className={styles.clientAction}>
+            <MessageIcon />
+            Message
+          </button>
+        )}
         <button className={`${styles.clientAction} ${styles.primary}`}>
           <EyeIcon />
           Voir fiche
@@ -494,39 +555,36 @@ const ClientCard = ({ client }) => {
 /* ==========================================
    PAGINATION COMPONENT
 ========================================== */
-const Pagination = ({ currentPage, totalPages, onPageChange }) => {
-  if (totalPages <= 1) return null;
-  return (
-    <div className={styles.pagination}>
+const Pagination = ({ currentPage, totalPages, onPageChange }) => (
+  <div className={styles.pagination}>
+    <button
+      className={styles.paginationBtn}
+      onClick={() => onPageChange(currentPage - 1)}
+      disabled={currentPage === 1}
+    >
+      <ChevronLeftIcon />
+    </button>
+    {[...Array(totalPages)].map((_, index) => (
       <button
-        className={styles.paginationBtn}
-        onClick={() => onPageChange(currentPage - 1)}
-        disabled={currentPage === 1}
+        key={index}
+        className={`${styles.paginationBtn} ${currentPage === index + 1 ? styles.active : ''}`}
+        onClick={() => onPageChange(index + 1)}
       >
-        <ChevronLeftIcon />
+        {index + 1}
       </button>
-      {[...Array(Math.min(totalPages, 5))].map((_, index) => (
-        <button
-          key={index}
-          className={`${styles.paginationBtn} ${currentPage === index + 1 ? styles.active : ''}`}
-          onClick={() => onPageChange(index + 1)}
-        >
-          {index + 1}
-        </button>
-      ))}
-      <button
-        className={styles.paginationBtn}
-        onClick={() => onPageChange(currentPage + 1)}
-        disabled={currentPage === totalPages}
-      >
-        <ChevronRightIcon />
-      </button>
-    </div>
-  );
-};
+    ))}
+    <button
+      className={styles.paginationBtn}
+      onClick={() => onPageChange(currentPage + 1)}
+      disabled={currentPage === totalPages}
+    >
+      <ChevronRightIcon />
+    </button>
+  </div>
+);
 
 /* ==========================================
-   MAIN COMPONENT — Connected to Backend
+   MAIN COMPONENT — Design original + Backend Supabase
 ========================================== */
 const AgentClients = () => {
   const { user } = useAuthContext();
@@ -540,7 +598,7 @@ const AgentClients = () => {
 
   const ITEMS_PER_PAGE = 12;
 
-  /* ── Load clients from visits (prospects) + rentals (tenants/owners) ── */
+  /* ── Load clients from Supabase: visits (prospects) + rentals (tenants) ── */
   const loadClients = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -548,7 +606,7 @@ const AgentClients = () => {
     const clientMap = new Map<string, ClientData>();
     const now = new Date();
 
-    // 1. Load prospects from visits table
+    // 1. Prospects from visits table
     try {
       const { data: visits } = await (supabase as any)
         .from('visits')
@@ -557,7 +615,6 @@ const AgentClients = () => {
         .limit(200);
 
       if (visits) {
-        // Group visits by lead_name to deduplicate
         const byName = new Map<string, any[]>();
         for (const v of visits) {
           const key = v.lead_name?.toLowerCase().trim();
@@ -567,27 +624,24 @@ const AgentClients = () => {
         }
 
         for (const [, group] of byName) {
-          const latest = group[0]; // Most recent visit
+          const latest = group[0];
           const hasUpcoming = group.some(v => new Date(v.scheduled_at) > now && v.status !== 'cancelled');
           const upcomingVisit = group.find(v => new Date(v.scheduled_at) > now && v.status !== 'cancelled');
           const needsRelance = latest.follow_up_required && !latest.relance_sent_at;
           const daysSinceContact = Math.floor((now.getTime() - new Date(latest.updated_at).getTime()) / 86400000);
 
           const statuses: string[] = [];
-          // AI score status
           if (latest.ai_prospect_score === 'hot') statuses.push('hot');
           else if (latest.ai_prospect_score === 'warm') statuses.push('warm');
           else if (latest.ai_prospect_score === 'cold') statuses.push('cold');
-          // Urgency
           if (needsRelance || daysSinceContact >= 3) statuses.push('urgent');
-          // Visit planned
           if (hasUpcoming) statuses.push('visit');
-          // Signature
           if (group.some(v => v.type === 'signature' && v.status === 'completed')) statuses.push('converted');
-          // Default
+          if (group.some(v => v.type === 'contre-visite')) statuses.push('negotiation');
+          if (latest.ai_prospect_score === 'hot' || latest.ai_prospect_score === 'warm') statuses.push('qualified');
           if (statuses.length === 0) statuses.push('contacted');
 
-          const criteria = latest.lead_notes || 
+          const criteria = latest.lead_notes ||
             (latest.property ? `${latest.property.type || 'Bien'} • ${latest.property.city || 'Conakry'}${latest.property.price ? ` • ${Number(latest.property.price).toLocaleString('fr-FR')} GNF` : ''}` : 'Non défini');
 
           clientMap.set(latest.lead_name, {
@@ -611,7 +665,7 @@ const AgentClients = () => {
       console.warn('[Clients] Error loading visits:', e);
     }
 
-    // 2. Load tenants from rentals
+    // 2. Tenants from rentals
     try {
       const { data: rentals } = await (supabase as any)
         .from('rentals')
@@ -622,10 +676,9 @@ const AgentClients = () => {
 
       if (rentals) {
         for (const r of rentals) {
-          // Load tenant profile
           const { data: profile } = await supabase
             .from('profiles')
-            .select('full_name, phone, avatar_url')
+            .select('full_name, phone')
             .eq('id', r.tenant_id)
             .single();
 
@@ -657,13 +710,11 @@ const AgentClients = () => {
     loadClients();
   }, [loadClients]);
 
-  /* ── Filter & sort clients ── */
+  /* ── Filter, sort & paginate ── */
   const filteredClients = clients.filter(c => {
-    // Tab filter
     if (activeTab === 'prospects' && c.type !== 'prospect') return false;
     if (activeTab === 'owners' && c.type !== 'owner') return false;
     if (activeTab === 'tenants' && c.type !== 'tenant') return false;
-    // Search
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return c.name.toLowerCase().includes(q) || c.phone.includes(q) || c.email?.toLowerCase().includes(q);
@@ -671,20 +722,17 @@ const AgentClients = () => {
     return true;
   });
 
-  // Sort
   const sortedClients = [...filteredClients].sort((a, b) => {
     if (sortBy === 'name') return a.name.localeCompare(b.name);
-    // Urgent first by default
     if (a.isUrgent && !b.isUrgent) return -1;
     if (!a.isUrgent && b.isUrgent) return 1;
     return 0;
   });
 
-  // Paginate
   const totalPages = Math.max(1, Math.ceil(sortedClients.length / ITEMS_PER_PAGE));
   const paginatedClients = sortedClients.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-  // Stats
+  /* ── Dynamic stats ── */
   const prospects = clients.filter(c => c.type === 'prospect');
   const urgentCount = clients.filter(c => c.isUrgent).length;
   const visitCount = clients.filter(c => c.statuses.includes('visit')).length;
@@ -692,8 +740,8 @@ const AgentClients = () => {
   const stats = [
     { icon: UsersIcon, iconStyle: 'primary', value: clients.length, label: 'Total clients' },
     { icon: SearchIcon, iconStyle: 'info', value: prospects.length, label: 'Prospects actifs' },
-    { icon: ClockIcon, iconStyle: 'error', value: urgentCount, label: 'À relancer', variant: 'error' },
-    { icon: CalendarIcon, iconStyle: 'gold', value: visitCount, label: 'Visites planifiées', variant: 'gold' },
+    { icon: ClockIcon, iconStyle: 'error', value: urgentCount, label: 'À relancer aujourd\'hui', variant: 'error' },
+    { icon: CalendarIcon, iconStyle: 'gold', value: visitCount, label: 'Visites cette semaine', variant: 'gold' },
   ];
 
   const tabs = [
@@ -704,12 +752,12 @@ const AgentClients = () => {
   ];
 
   const alert = urgentCount > 0
-    ? { title: `${urgentCount} client(s) à relancer`, description: `Ne manquez pas ces opportunités ! ${urgentCount} prospect(s) attendent votre retour.` }
+    ? { title: `${urgentCount} client(s) à relancer aujourd'hui`, description: `Ne manquez pas ces opportunités ! ${urgentCount} prospect(s) attendent votre retour.` }
     : null;
 
   return (
     <>
-      <TopBar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+      <TopBar searchQuery={searchQuery} onSearchChange={setSearchQuery} urgentCount={urgentCount} />
 
       <div className={styles.pageContent}>
         <PageHeader totalClients={clients.length} />
@@ -729,6 +777,8 @@ const AgentClients = () => {
           onViewModeChange={setViewMode}
           sortBy={sortBy}
           onSortChange={setSortBy}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
         />
 
         {loading ? (
