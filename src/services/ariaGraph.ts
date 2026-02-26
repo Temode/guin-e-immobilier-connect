@@ -54,7 +54,7 @@ export interface ActionResult {
   details: string;
 }
 
-export interface AriaGraphState {
+export type AriaGraphState = {
   // Input
   userId: string;
   agentName: string;
@@ -84,7 +84,7 @@ export interface AriaGraphState {
   // Final
   finalResponse: string;
   error: string | null;
-}
+};
 
 /* ══════════════════════════════════════════
    Helpers API
