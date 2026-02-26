@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_conversations: {
+        Row: {
+          agent_id: string
+          content: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          role: string
+        }
+        Insert: {
+          agent_id: string
+          content: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role: string
+        }
+        Update: {
+          agent_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role?: string
+        }
+        Relationships: []
+      }
+      ai_monthly_usage: {
+        Row: {
+          advanced_messages_count: number
+          advanced_tokens_used: number
+          agent_id: string
+          created_at: string
+          free_messages_count: number
+          id: string
+          month_year: string
+          updated_at: string
+        }
+        Insert: {
+          advanced_messages_count?: number
+          advanced_tokens_used?: number
+          agent_id: string
+          created_at?: string
+          free_messages_count?: number
+          id?: string
+          month_year: string
+          updated_at?: string
+        }
+        Update: {
+          advanced_messages_count?: number
+          advanced_tokens_used?: number
+          agent_id?: string
+          created_at?: string
+          free_messages_count?: number
+          id?: string
+          month_year?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       conversation_participants: {
         Row: {
           conversation_id: string
@@ -412,6 +472,80 @@ export type Database = {
         }
         Relationships: []
       }
+      visits: {
+        Row: {
+          address: string | null
+          agent_id: string
+          agent_notes: string | null
+          ai_prospect_score: string | null
+          ai_suggested: boolean | null
+          created_at: string
+          duration_minutes: number | null
+          follow_up_required: boolean | null
+          id: string
+          lead_email: string | null
+          lead_name: string
+          lead_notes: string | null
+          lead_phone: string | null
+          property_id: string | null
+          relance_sent_at: string | null
+          scheduled_at: string
+          status: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          agent_id: string
+          agent_notes?: string | null
+          ai_prospect_score?: string | null
+          ai_suggested?: boolean | null
+          created_at?: string
+          duration_minutes?: number | null
+          follow_up_required?: boolean | null
+          id?: string
+          lead_email?: string | null
+          lead_name: string
+          lead_notes?: string | null
+          lead_phone?: string | null
+          property_id?: string | null
+          relance_sent_at?: string | null
+          scheduled_at: string
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          agent_id?: string
+          agent_notes?: string | null
+          ai_prospect_score?: string | null
+          ai_suggested?: boolean | null
+          created_at?: string
+          duration_minutes?: number | null
+          follow_up_required?: boolean | null
+          id?: string
+          lead_email?: string | null
+          lead_name?: string
+          lead_notes?: string | null
+          lead_phone?: string | null
+          property_id?: string | null
+          relance_sent_at?: string | null
+          scheduled_at?: string
+          status?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visits_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wallets: {
         Row: {
           balance: number
@@ -493,6 +627,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_ai_usage: {
+        Args: { p_agent_id: string; p_is_advanced?: boolean; p_tokens?: number }
+        Returns: Json
       }
       is_conversation_member: {
         Args: { _conversation_id: string; _user_id: string }

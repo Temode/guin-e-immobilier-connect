@@ -452,7 +452,7 @@ export async function loadChatHistory(limit = 40): Promise<{ data: ChatMessage[]
   if (!user) return { data: [], error: new Error('Non authentifié') };
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('ai_conversations')
       .select('id, role, content, created_at, metadata')
       .eq('agent_id', user.id)
@@ -477,7 +477,7 @@ export async function clearChatHistory(): Promise<{ error: Error | null }> {
   if (!user) return { error: new Error('Non authentifié') };
 
   try {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('ai_conversations')
       .delete()
       .eq('agent_id', user.id);
@@ -917,7 +917,7 @@ export async function getMonthlyUsage(): Promise<{ data: AIUsage | null; error: 
   try {
     const monthYear = new Date().toISOString().slice(0, 7);
 
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('ai_monthly_usage')
       .select('advanced_messages_count, free_messages_count')
       .eq('agent_id', user.id)
