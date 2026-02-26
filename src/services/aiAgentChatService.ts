@@ -107,8 +107,27 @@ TES CAPACITÉS ACTIVES
 2. 📊 RAPPORTS : Générer le rapport d'activité quotidien (visites, conversions, actions)
 3. ✉️ RELANCES : Rédiger des messages multi-canal (WhatsApp, Email, SMS)
 4. 🔍 ANALYSE : Scorer les prospects et identifier les opportunités
-5. 📅 AGENDA : Suggérer des visites basées sur l'analyse des conversations
+5. 📅 AGENDA : CRÉER, MODIFIER et SUPPRIMER des visites/rendez-vous dans l'agenda de l'agent
 6. 💡 COACHING : Conseiller sur les techniques de négociation et de closing
+
+═══════════════════════════════════════
+ACTIONS EXÉCUTABLES (TRÈS IMPORTANT)
+═══════════════════════════════════════
+Tu peux DIRECTEMENT exécuter des actions sur la plateforme. Quand tu veux créer ou modifier une visite,
+inclus un bloc d'action dans ta réponse au format suivant :
+
+Pour CRÉER une visite :
+[ACTION:CREATE_VISIT]{"lead_name":"Nom du prospect","lead_phone":"+224...","lead_notes":"Notes","type":"visit","scheduled_at":"2026-03-01T10:00:00","address":"Adresse","ai_prospect_score":"hot"}[/ACTION]
+
+Pour MODIFIER une visite existante (utilise l'ID de la visite si disponible dans le contexte) :
+[ACTION:UPDATE_VISIT]{"visit_id":"uuid","scheduled_at":"2026-03-01T14:00:00","status":"confirmed","lead_notes":"Notes","ai_prospect_score":"hot"}[/ACTION]
+
+RÈGLES D'ACTION :
+- Quand l'agent te demande d'ajouter un créneau/visite → CRÉE-LA avec CREATE_VISIT
+- Quand l'agent te demande de déplacer/modifier une visite → MODIFIE-LA avec UPDATE_VISIT
+- Tu peux exécuter plusieurs actions dans la même réponse
+- Confirme TOUJOURS à l'agent ce que tu as fait après l'action
+- NE DEMANDE PAS à l'agent de le faire lui-même — TU LE FAIS
 
 ═══════════════════════════════════════
 FORMAT DE TES RÉPONSES
@@ -628,10 +647,75 @@ async function buildAgentContext(userId: string, agentName: string): Promise<str
    Mode standard → Gemini Flash (rapide, économique)
    Mode avancé → Claude Sonnet + Extended Thinking
    ══════════════════════════════════════════════════════ */
+/** Parse and execute action blocks from ARIA's response */
+async function executeAriaActions(responseText: string, userId: string): Promise<{ cleanedText: string; actionsExecuted: string[] }> {
+  const actionsExecuted: string[] = [];
+  let cleanedText = responseText;
+
+  // Parse CREATE_VISIT actions
+  const createRegex = /\[ACTION:CREATE_VISIT\](.*?)\[\/ACTION\]/gs;
+  let match;
+  while ((match = createRegex.exec(responseText)) !== null) {
+    try {
+      const data = JSON.parse(match[1]);
+      const { error } = await (supabase as any).from('visits').insert({
+        agent_id: userId,
+        lead_name: data.lead_name || 'Prospect',
+        lead_phone: data.lead_phone || null,
+        lead_email: data.lead_email || null,
+        lead_notes: data.lead_notes || null,
+        type: data.type || 'visit',
+        status: 'pending',
+        scheduled_at: data.scheduled_at || new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+        duration_minutes: data.duration_minutes || 60,
+        address: data.address || null,
+        ai_prospect_score: data.ai_prospect_score || 'unknown',
+        ai_suggested: true,
+        property_id: data.property_id || null,
+      });
+      if (!error) {
+        actionsExecuted.push(`✅ Visite créée pour ${data.lead_name}`);
+      } else {
+        actionsExecuted.push(`⚠️ Erreur création visite: ${error.message}`);
+      }
+    } catch (e) {
+      console.warn('[ARIA] Failed to parse CREATE_VISIT action:', e);
+    }
+    cleanedText = cleanedText.replace(match[0], '');
+  }
+
+  // Parse UPDATE_VISIT actions
+  const updateRegex = /\[ACTION:UPDATE_VISIT\](.*?)\[\/ACTION\]/gs;
+  while ((match = updateRegex.exec(responseText)) !== null) {
+    try {
+      const data = JSON.parse(match[1]);
+      if (!data.visit_id) continue;
+      const updatePayload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (data.scheduled_at) updatePayload.scheduled_at = data.scheduled_at;
+      if (data.status) updatePayload.status = data.status;
+      if (data.lead_notes) updatePayload.lead_notes = data.lead_notes;
+      if (data.ai_prospect_score) updatePayload.ai_prospect_score = data.ai_prospect_score;
+      if (data.agent_notes) updatePayload.agent_notes = data.agent_notes;
+
+      const { error } = await (supabase as any).from('visits').update(updatePayload).eq('id', data.visit_id).eq('agent_id', userId);
+      if (!error) {
+        actionsExecuted.push(`✅ Visite mise à jour`);
+      } else {
+        actionsExecuted.push(`⚠️ Erreur mise à jour: ${error.message}`);
+      }
+    } catch (e) {
+      console.warn('[ARIA] Failed to parse UPDATE_VISIT action:', e);
+    }
+    cleanedText = cleanedText.replace(match[0], '');
+  }
+
+  return { cleanedText: cleanedText.trim(), actionsExecuted };
+}
+
 export async function sendMessageToAria(
   message: string,
   useAdvancedModel = false,
-): Promise<{ data: { message: string; model: string; tokensUsed: number } | null; error: Error | null }> {
+): Promise<{ data: { message: string; model: string; tokensUsed: number; actionsExecuted?: string[] } | null; error: Error | null }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: null, error: new Error('Non authentifié — veuillez vous reconnecter.') };
@@ -668,22 +752,25 @@ export async function sendMessageToAria(
     ];
 
     const task: AITask = useAdvancedModel ? 'chat-advanced' : 'chat';
-    const { text: assistantMessage, tokensUsed, model } = await callAI(
+    const { text: rawResponse, tokensUsed, model } = await callAI(
       task,
       SYSTEM_PROMPT + contextSuffix,
       messages,
       1024,
     );
 
-    if (!assistantMessage) {
+    if (!rawResponse) {
       return { data: null, error: new Error('ARIA n\'a pas pu générer de réponse.') };
     }
+
+    // Execute any action blocks in the response
+    const { cleanedText: assistantMessage, actionsExecuted } = await executeAriaActions(rawResponse, user.id);
 
     // Save to DB (non-blocking)
     saveToHistory(user.id, message, assistantMessage, model, tokensUsed);
 
     return {
-      data: { message: assistantMessage, model, tokensUsed },
+      data: { message: assistantMessage, model, tokensUsed, actionsExecuted },
       error: null,
     };
   } catch (err) {

@@ -233,6 +233,76 @@ export function useAriaContext() {
      CopilotKit Actions — Ce que l'IA peut faire
      ══════════════════════════════════════════ */
 
+  // Action : Créer une visite dans l'agenda
+  useCopilotAction({
+    name: 'create_visit',
+    description: "Crée une nouvelle visite/rendez-vous dans l'agenda de l'agent. Utilise cette action quand l'agent demande d'ajouter un créneau, planifier une visite, ou programmer un rendez-vous.",
+    parameters: [
+      { name: 'lead_name', type: 'string' as const, description: 'Nom du prospect/client', required: true },
+      { name: 'scheduled_at', type: 'string' as const, description: 'Date et heure au format ISO (ex: 2026-03-01T10:00:00)', required: true },
+      { name: 'type', type: 'string' as const, description: 'Type: visit, contre-visite, signature, etat-lieux', required: false },
+      { name: 'lead_phone', type: 'string' as const, description: 'Téléphone du prospect', required: false },
+      { name: 'lead_notes', type: 'string' as const, description: 'Notes sur le prospect', required: false },
+      { name: 'address', type: 'string' as const, description: 'Adresse de la visite', required: false },
+      { name: 'ai_prospect_score', type: 'string' as const, description: 'Score prospect: hot, warm, cold', required: false },
+    ],
+    handler: async (params: { lead_name: string; scheduled_at: string; type?: string; lead_phone?: string; lead_notes?: string; address?: string; ai_prospect_score?: string }) => {
+      if (!user) return 'Non authentifié';
+      setIsLoading(true);
+      try {
+        const { error } = await (supabase as any).from('visits').insert({
+          agent_id: user.id,
+          lead_name: params.lead_name,
+          lead_phone: params.lead_phone || null,
+          lead_notes: params.lead_notes || null,
+          type: params.type || 'visit',
+          status: 'pending',
+          scheduled_at: params.scheduled_at,
+          duration_minutes: 60,
+          address: params.address || null,
+          ai_prospect_score: params.ai_prospect_score || 'unknown',
+          ai_suggested: true,
+        });
+        if (error) return `Erreur : ${error.message}`;
+        refreshData();
+        return `✅ Visite créée pour ${params.lead_name} le ${new Date(params.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}`;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+  });
+
+  // Action : Modifier une visite existante
+  useCopilotAction({
+    name: 'update_visit',
+    description: "Modifie une visite existante dans l'agenda (changer la date, le statut, les notes, le score prospect). Utilise cette action quand l'agent demande de déplacer, confirmer, annuler ou modifier un rendez-vous.",
+    parameters: [
+      { name: 'visit_id', type: 'string' as const, description: "L'identifiant UUID de la visite à modifier", required: true },
+      { name: 'scheduled_at', type: 'string' as const, description: 'Nouvelle date/heure (ISO)', required: false },
+      { name: 'status', type: 'string' as const, description: 'Nouveau statut: confirmed, pending, cancelled, completed', required: false },
+      { name: 'lead_notes', type: 'string' as const, description: 'Nouvelles notes', required: false },
+      { name: 'ai_prospect_score', type: 'string' as const, description: 'Nouveau score: hot, warm, cold', required: false },
+    ],
+    handler: async (params: { visit_id: string; scheduled_at?: string; status?: string; lead_notes?: string; ai_prospect_score?: string }) => {
+      if (!user) return 'Non authentifié';
+      setIsLoading(true);
+      try {
+        const updatePayload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+        if (params.scheduled_at) updatePayload.scheduled_at = params.scheduled_at;
+        if (params.status) updatePayload.status = params.status;
+        if (params.lead_notes) updatePayload.lead_notes = params.lead_notes;
+        if (params.ai_prospect_score) updatePayload.ai_prospect_score = params.ai_prospect_score;
+
+        const { error } = await (supabase as any).from('visits').update(updatePayload).eq('id', params.visit_id).eq('agent_id', user.id);
+        if (error) return `Erreur : ${error.message}`;
+        refreshData();
+        return `✅ Visite mise à jour avec succès`;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+  });
+
   // Action : Générer le rapport quotidien
   useCopilotAction({
     name: 'generate_daily_report',

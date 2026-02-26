@@ -1,4 +1,7 @@
-import { useState } from 'react';
+// @ts-nocheck
+import { useState, useEffect, useCallback } from 'react';
+import { useAuthContext } from '@/context/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import styles from './AgentClients.module.css';
 
 /* ==========================================
@@ -56,14 +59,6 @@ const SunIcon = ({ className }: { className?: string }) => (
   <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
     <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0z" />
   </svg>
-);
-
-const StarIcon = ({ className, filled = false }: { className?: string; filled?: boolean }) => (
-  filled ? (
-    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-    </svg>
-  ) : null
 );
 
 const SparklesIcon = ({ className }: { className?: string }) => (
@@ -158,38 +153,84 @@ const ChevronRightIcon = ({ className }: { className?: string }) => (
 );
 
 /* ==========================================
+   HELPERS
+========================================== */
+function getInitials(name: string): string {
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '??';
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return mins <= 1 ? "à l'instant" : `il y a ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `il y a ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'hier';
+  if (days < 7) return `il y a ${days} jours`;
+  const weeks = Math.floor(days / 7);
+  return `il y a ${weeks} semaine${weeks > 1 ? 's' : ''}`;
+}
+
+/* ==========================================
+   TYPES
+========================================== */
+interface ClientData {
+  id: string;
+  name: string;
+  initials: string;
+  type: 'prospect' | 'owner' | 'tenant';
+  phone: string;
+  email?: string;
+  statuses: string[];
+  isUrgent: boolean;
+  criteria: string;
+  lastContact: string;
+  lastNote: string;
+  visitInfo?: string;
+  properties?: string;
+  ai_prospect_score?: string;
+}
+
+/* ==========================================
    TOP BAR COMPONENT
 ========================================== */
-const TopBar = () => (
-  <header className={styles.topBar}>
-    <div className={styles.topBarLeft}>
-      <div className={styles.pageContext}>
-        <span className={styles.pageDate}>
-          Mardi 4 février 2025
-          <span className={styles.weather}>
-            <SunIcon />
-            28°C Conakry
+const TopBar = ({ searchQuery, onSearchChange }) => {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+
+  return (
+    <header className={styles.topBar}>
+      <div className={styles.topBarLeft}>
+        <div className={styles.pageContext}>
+          <span className={styles.pageDate}>
+            {capitalizedDate}
+            <span className={styles.weather}>
+              <SunIcon />
+              28°C Conakry
+            </span>
           </span>
-        </span>
-        <h1 className={styles.pageTitle}>Mes clients</h1>
+          <h1 className={styles.pageTitle}>Mes clients</h1>
+        </div>
       </div>
-    </div>
-    <div className={styles.topBarRight}>
-      <div className={styles.searchBox}>
-        <SearchIcon />
-        <input type="text" placeholder="Rechercher un client..." />
+      <div className={styles.topBarRight}>
+        <div className={styles.searchBox}>
+          <SearchIcon />
+          <input
+            type="text"
+            placeholder="Rechercher un client..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+        </div>
+        <button className={styles.iconBtn}>
+          <NotificationIcon />
+        </button>
       </div>
-      <button className={styles.iconBtn}>
-        <NotificationIcon />
-        <span className={styles.notificationBadge}>3</span>
-      </button>
-      <button className={`${styles.btn} ${styles.btnPrimary}`}>
-        <UserAddIcon />
-        Ajouter un client
-      </button>
-    </div>
-  </header>
-);
+    </header>
+  );
+};
 
 /* ==========================================
    PAGE HEADER COMPONENT
@@ -206,10 +247,6 @@ const PageHeader = ({ totalClients }) => (
       <button className={`${styles.btn} ${styles.btnSecondary}`}>
         <ExportIcon />
         Exporter
-      </button>
-      <button className={`${styles.btn} ${styles.btnPrimary}`}>
-        <UserAddIcon />
-        Ajouter un client
       </button>
     </div>
   </div>
@@ -237,20 +274,20 @@ const StatsGrid = ({ stats }) => (
 /* ==========================================
    ALERT BANNER COMPONENT
 ========================================== */
-const AlertBanner = ({ alert }) => (
-  <div className={styles.alertsBanner}>
-    <div className={styles.alertsBannerIcon}>
-      <ClockIcon />
+const AlertBanner = ({ alert }) => {
+  if (!alert) return null;
+  return (
+    <div className={styles.alertsBanner}>
+      <div className={styles.alertsBannerIcon}>
+        <ClockIcon />
+      </div>
+      <div className={styles.alertsBannerContent}>
+        <h3>{alert.title}</h3>
+        <p>{alert.description}</p>
+      </div>
     </div>
-    <div className={styles.alertsBannerContent}>
-      <h3>{alert.title}</h3>
-      <p>{alert.description}</p>
-    </div>
-    <button className={`${styles.btn} ${styles.btnGold} ${styles.btnSm}`}>
-      Voir les relances
-    </button>
-  </div>
-);
+  );
+};
 
 /* ==========================================
    TABS COMPONENT
@@ -276,10 +313,6 @@ const Tabs = ({ tabs, activeTab, onTabChange }) => (
 const FiltersBar = ({ viewMode, onViewModeChange, sortBy, onSortChange }) => (
   <div className={styles.filtersBar}>
     <div className={styles.filtersLeft}>
-      <div className={styles.filterSearch}>
-        <SearchIcon />
-        <input type="text" placeholder="Rechercher par nom, téléphone, email..." />
-      </div>
       <button className={styles.filterBtn}>
         <CheckCircleIcon />
         Statut
@@ -331,6 +364,9 @@ const ClientCard = ({ client }) => {
     new: { label: 'Nouveau • À qualifier', icon: PlusIcon, className: 'new' },
     converted: { label: 'Actif', icon: CheckCircleIcon, className: 'converted' },
     contacted: { label: 'Contacté', icon: MessageIcon, className: 'contacted' },
+    hot: { label: '🔥 Prospect chaud', icon: SparklesIcon, className: 'negotiation' },
+    warm: { label: '🟡 Prospect tiède', icon: ClockIcon, className: 'visit' },
+    cold: { label: '❄️ Prospect froid', icon: ClockIcon, className: 'contacted' },
   };
 
   const typeConfig = {
@@ -348,14 +384,14 @@ const ClientCard = ({ client }) => {
         <div className={styles.clientInfo}>
           <h3 className={styles.clientName}>
             {client.name}
-            <span className={`${styles.clientTypeBadge} ${styles[typeConfig[client.type].className]}`}>
-              {typeConfig[client.type].label}
+            <span className={`${styles.clientTypeBadge} ${styles[typeConfig[client.type]?.className || 'prospect']}`}>
+              {typeConfig[client.type]?.label || 'Client'}
             </span>
           </h3>
           <div className={styles.clientContact}>
             <span>
               <PhoneIcon />
-              {client.phone}
+              {client.phone || 'Non renseigné'}
             </span>
             {client.email && (
               <span>
@@ -394,10 +430,6 @@ const ClientCard = ({ client }) => {
                   <BuildingIcon />
                   Voir ses biens
                 </div>
-                <div className={styles.dropdownItem}>
-                  <PlusIcon />
-                  Ajouter un bien
-                </div>
               </>
             )}
             <div className={styles.dropdownDivider}></div>
@@ -412,6 +444,7 @@ const ClientCard = ({ client }) => {
       <div className={styles.clientStatus}>
         {client.statuses.map((status, index) => {
           const config = statusConfig[status];
+          if (!config) return null;
           const StatusIcon = config.icon;
           return (
             <span key={index} className={`${styles.statusBadge} ${styles[config.className]}`}>
@@ -439,34 +472,16 @@ const ClientCard = ({ client }) => {
       </div>
 
       <div className={styles.clientFooter}>
+        {client.phone && (
+          <button className={styles.clientAction}>
+            <PhoneIcon />
+            Appeler
+          </button>
+        )}
         <button className={styles.clientAction}>
-          <PhoneIcon />
-          Appeler
+          <MessageIcon />
+          Message
         </button>
-        {client.type === 'prospect' && client.statuses.includes('negotiation') && (
-          <button className={`${styles.clientAction} ${styles.gold}`}>
-            <CheckCircleIcon />
-            Convertir
-          </button>
-        )}
-        {client.type === 'prospect' && client.statuses.includes('qualified') && (
-          <button className={styles.clientAction}>
-            <CalendarIcon />
-            Planifier
-          </button>
-        )}
-        {client.type === 'prospect' && !client.statuses.includes('negotiation') && !client.statuses.includes('qualified') && (
-          <button className={styles.clientAction}>
-            <MessageIcon />
-            Message
-          </button>
-        )}
-        {client.type === 'owner' && (
-          <button className={styles.clientAction}>
-            <BuildingIcon />
-            Ses biens
-          </button>
-        )}
         <button className={`${styles.clientAction} ${styles.primary}`}>
           <EyeIcon />
           Voir fiche
@@ -479,152 +494,234 @@ const ClientCard = ({ client }) => {
 /* ==========================================
    PAGINATION COMPONENT
 ========================================== */
-const Pagination = ({ currentPage, totalPages, onPageChange }) => (
-  <div className={styles.pagination}>
-    <button
-      className={styles.paginationBtn}
-      onClick={() => onPageChange(currentPage - 1)}
-      disabled={currentPage === 1}
-    >
-      <ChevronLeftIcon />
-    </button>
-    {[...Array(totalPages)].map((_, index) => (
+const Pagination = ({ currentPage, totalPages, onPageChange }) => {
+  if (totalPages <= 1) return null;
+  return (
+    <div className={styles.pagination}>
       <button
-        key={index}
-        className={`${styles.paginationBtn} ${currentPage === index + 1 ? styles.active : ''}`}
-        onClick={() => onPageChange(index + 1)}
+        className={styles.paginationBtn}
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
       >
-        {index + 1}
+        <ChevronLeftIcon />
       </button>
-    ))}
-    <button
-      className={styles.paginationBtn}
-      onClick={() => onPageChange(currentPage + 1)}
-      disabled={currentPage === totalPages}
-    >
-      <ChevronRightIcon />
-    </button>
-  </div>
-);
+      {[...Array(Math.min(totalPages, 5))].map((_, index) => (
+        <button
+          key={index}
+          className={`${styles.paginationBtn} ${currentPage === index + 1 ? styles.active : ''}`}
+          onClick={() => onPageChange(index + 1)}
+        >
+          {index + 1}
+        </button>
+      ))}
+      <button
+        className={styles.paginationBtn}
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+      >
+        <ChevronRightIcon />
+      </button>
+    </div>
+  );
+};
 
 /* ==========================================
-   MAIN COMPONENT
+   MAIN COMPONENT — Connected to Backend
 ========================================== */
 const AgentClients = () => {
+  const { user } = useAuthContext();
   const [activeTab, setActiveTab] = useState('all');
   const [viewMode, setViewMode] = useState('grid');
   const [sortBy, setSortBy] = useState('lastContact');
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [clients, setClients] = useState<ClientData[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock Data
-  const mockData = {
-    stats: [
-      { icon: UsersIcon, iconStyle: 'primary', value: 47, label: 'Total clients' },
-      { icon: SearchIcon, iconStyle: 'info', value: 28, label: 'Prospects actifs' },
-      { icon: ClockIcon, iconStyle: 'error', value: 5, label: 'À relancer aujourd\'hui', variant: 'error' },
-      { icon: CalendarIcon, iconStyle: 'gold', value: 3, label: 'Visites cette semaine', variant: 'gold' },
-    ],
-    alert: {
-      title: '5 clients à relancer aujourd\'hui',
-      description: 'Ne manquez pas ces opportunités ! 2 prospects en négociation et 3 qualifiés attendent votre retour.',
-    },
-    tabs: [
-      { id: 'all', label: 'Tous', count: 47 },
-      { id: 'prospects', label: 'Prospects', count: 28 },
-      { id: 'owners', label: 'Propriétaires', count: 12 },
-      { id: 'tenants', label: 'Locataires', count: 7 },
-    ],
-    clients: [
-      {
-        id: 1,
-        name: 'Mamadou Diallo',
-        initials: 'MD',
-        type: 'prospect',
-        phone: '+224 620 12 34 56',
-        email: 'm.diallo@email.com',
-        statuses: ['urgent', 'negotiation'],
-        isUrgent: true,
-        criteria: 'F3 Meublé • Kipé • 2-3M GNF',
-        lastContact: 'il y a 3 jours',
-        lastNote: 'Très intéressé par l\'appart F3 à Kipé. Budget confirmé à 2,5M.',
-      },
-      {
-        id: 2,
-        name: 'Aissatou Barry',
-        initials: 'AB',
-        type: 'prospect',
-        phone: '+224 622 45 67 89',
-        statuses: ['urgent', 'qualified'],
-        isUrgent: true,
-        criteria: 'Villa F4 • Lambanyi • 3 - 5M GNF',
-        lastContact: 'il y a 5 jours',
-        lastNote: 'Budget confirmé. Cherche avec jardin pour les enfants.',
-      },
-      {
-        id: 3,
-        name: 'Sékou Camara',
-        initials: 'SC',
-        type: 'owner',
-        phone: '+224 621 98 76 54',
-        email: 's.camara@email.com',
-        statuses: ['converted'],
-        properties: '3 biens en gestion',
-        criteria: '• 2 loués, 1 actif',
-        lastContact: 'il y a 1 semaine',
-        lastNote: 'Veut discuter du renouvellement du mandat pour la villa F5.',
-      },
-      {
-        id: 4,
-        name: 'Ibrahima Bah',
-        initials: 'IB',
-        type: 'prospect',
-        phone: '+224 625 11 22 33',
-        statuses: ['visit'],
-        visitInfo: 'Visite planifiée • Jeudi 10h',
-        criteria: 'Studio ou F2 • Ratoma Centre • 800K - 1,2M GNF',
-        lastContact: 'hier',
-        lastNote: 'Confirmé pour la visite du studio à Nongo jeudi matin.',
-      },
-      {
-        id: 5,
-        name: 'Fatoumata Keita',
-        initials: 'FK',
-        type: 'prospect',
-        phone: '+224 628 44 55 66',
-        statuses: ['new'],
-        criteria: 'Non défini',
-        lastContact: 'aujourd\'hui',
-        lastNote: 'Contact via le site. À rappeler pour définir les critères.',
-      },
-      {
-        id: 6,
-        name: 'Oumar Sow',
-        initials: 'OS',
-        type: 'prospect',
-        phone: '+224 626 77 88 99',
-        statuses: ['contacted'],
-        criteria: 'Appartement F2 • Cosa • 1-1,5M GNF',
-        lastContact: 'il y a 2 semaines',
-        lastNote: 'Premier contact effectué. Attend des propositions.',
-      },
-    ],
-  };
+  const ITEMS_PER_PAGE = 12;
+
+  /* ── Load clients from visits (prospects) + rentals (tenants/owners) ── */
+  const loadClients = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+
+    const clientMap = new Map<string, ClientData>();
+    const now = new Date();
+
+    // 1. Load prospects from visits table
+    try {
+      const { data: visits } = await (supabase as any)
+        .from('visits')
+        .select('id, lead_name, lead_phone, lead_email, lead_notes, type, status, scheduled_at, ai_prospect_score, follow_up_required, relance_sent_at, updated_at, property:property_id(title, city, type, price)')
+        .order('scheduled_at', { ascending: false })
+        .limit(200);
+
+      if (visits) {
+        // Group visits by lead_name to deduplicate
+        const byName = new Map<string, any[]>();
+        for (const v of visits) {
+          const key = v.lead_name?.toLowerCase().trim();
+          if (!key) continue;
+          if (!byName.has(key)) byName.set(key, []);
+          byName.get(key)!.push(v);
+        }
+
+        for (const [, group] of byName) {
+          const latest = group[0]; // Most recent visit
+          const hasUpcoming = group.some(v => new Date(v.scheduled_at) > now && v.status !== 'cancelled');
+          const upcomingVisit = group.find(v => new Date(v.scheduled_at) > now && v.status !== 'cancelled');
+          const needsRelance = latest.follow_up_required && !latest.relance_sent_at;
+          const daysSinceContact = Math.floor((now.getTime() - new Date(latest.updated_at).getTime()) / 86400000);
+
+          const statuses: string[] = [];
+          // AI score status
+          if (latest.ai_prospect_score === 'hot') statuses.push('hot');
+          else if (latest.ai_prospect_score === 'warm') statuses.push('warm');
+          else if (latest.ai_prospect_score === 'cold') statuses.push('cold');
+          // Urgency
+          if (needsRelance || daysSinceContact >= 3) statuses.push('urgent');
+          // Visit planned
+          if (hasUpcoming) statuses.push('visit');
+          // Signature
+          if (group.some(v => v.type === 'signature' && v.status === 'completed')) statuses.push('converted');
+          // Default
+          if (statuses.length === 0) statuses.push('contacted');
+
+          const criteria = latest.lead_notes || 
+            (latest.property ? `${latest.property.type || 'Bien'} • ${latest.property.city || 'Conakry'}${latest.property.price ? ` • ${Number(latest.property.price).toLocaleString('fr-FR')} GNF` : ''}` : 'Non défini');
+
+          clientMap.set(latest.lead_name, {
+            id: latest.id,
+            name: latest.lead_name,
+            initials: getInitials(latest.lead_name),
+            type: 'prospect',
+            phone: latest.lead_phone || '',
+            email: latest.lead_email || undefined,
+            statuses,
+            isUrgent: needsRelance || daysSinceContact >= 3,
+            criteria,
+            lastContact: timeAgo(latest.updated_at),
+            lastNote: latest.lead_notes || 'Aucune note',
+            visitInfo: upcomingVisit ? `${upcomingVisit.type === 'visit' ? 'Visite' : upcomingVisit.type === 'contre-visite' ? 'Contre-visite' : upcomingVisit.type === 'signature' ? 'Signature' : 'RDV'} • ${new Date(upcomingVisit.scheduled_at).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}` : undefined,
+            ai_prospect_score: latest.ai_prospect_score,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[Clients] Error loading visits:', e);
+    }
+
+    // 2. Load tenants from rentals
+    try {
+      const { data: rentals } = await (supabase as any)
+        .from('rentals')
+        .select('id, tenant_id, rent_amount, currency, start_date, status, updated_at, property:property_id(title, city, type)')
+        .or(`owner_id.eq.${user.id},agent_id.eq.${user.id}`)
+        .eq('status', 'active')
+        .limit(50);
+
+      if (rentals) {
+        for (const r of rentals) {
+          // Load tenant profile
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name, phone, avatar_url')
+            .eq('id', r.tenant_id)
+            .single();
+
+          if (profile?.full_name && !clientMap.has(profile.full_name)) {
+            clientMap.set(profile.full_name, {
+              id: r.id,
+              name: profile.full_name,
+              initials: getInitials(profile.full_name),
+              type: 'tenant',
+              phone: profile.phone || '',
+              statuses: ['converted'],
+              isUrgent: false,
+              criteria: `${r.property?.title || 'Bien'} • ${r.property?.city || ''} • ${Number(r.rent_amount).toLocaleString('fr-FR')} ${r.currency || 'GNF'}/mois`,
+              lastContact: timeAgo(r.updated_at || r.start_date),
+              lastNote: `Locataire actif depuis le ${new Date(r.start_date).toLocaleDateString('fr-FR')}`,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Clients] Error loading rentals:', e);
+    }
+
+    setClients(Array.from(clientMap.values()));
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => {
+    loadClients();
+  }, [loadClients]);
+
+  /* ── Filter & sort clients ── */
+  const filteredClients = clients.filter(c => {
+    // Tab filter
+    if (activeTab === 'prospects' && c.type !== 'prospect') return false;
+    if (activeTab === 'owners' && c.type !== 'owner') return false;
+    if (activeTab === 'tenants' && c.type !== 'tenant') return false;
+    // Search
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return c.name.toLowerCase().includes(q) || c.phone.includes(q) || c.email?.toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  // Sort
+  const sortedClients = [...filteredClients].sort((a, b) => {
+    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    // Urgent first by default
+    if (a.isUrgent && !b.isUrgent) return -1;
+    if (!a.isUrgent && b.isUrgent) return 1;
+    return 0;
+  });
+
+  // Paginate
+  const totalPages = Math.max(1, Math.ceil(sortedClients.length / ITEMS_PER_PAGE));
+  const paginatedClients = sortedClients.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  // Stats
+  const prospects = clients.filter(c => c.type === 'prospect');
+  const urgentCount = clients.filter(c => c.isUrgent).length;
+  const visitCount = clients.filter(c => c.statuses.includes('visit')).length;
+
+  const stats = [
+    { icon: UsersIcon, iconStyle: 'primary', value: clients.length, label: 'Total clients' },
+    { icon: SearchIcon, iconStyle: 'info', value: prospects.length, label: 'Prospects actifs' },
+    { icon: ClockIcon, iconStyle: 'error', value: urgentCount, label: 'À relancer', variant: 'error' },
+    { icon: CalendarIcon, iconStyle: 'gold', value: visitCount, label: 'Visites planifiées', variant: 'gold' },
+  ];
+
+  const tabs = [
+    { id: 'all', label: 'Tous', count: clients.length },
+    { id: 'prospects', label: 'Prospects', count: prospects.length },
+    { id: 'owners', label: 'Propriétaires', count: clients.filter(c => c.type === 'owner').length },
+    { id: 'tenants', label: 'Locataires', count: clients.filter(c => c.type === 'tenant').length },
+  ];
+
+  const alert = urgentCount > 0
+    ? { title: `${urgentCount} client(s) à relancer`, description: `Ne manquez pas ces opportunités ! ${urgentCount} prospect(s) attendent votre retour.` }
+    : null;
 
   return (
     <>
-      <TopBar />
+      <TopBar searchQuery={searchQuery} onSearchChange={setSearchQuery} />
 
       <div className={styles.pageContent}>
-        <PageHeader totalClients={47} />
+        <PageHeader totalClients={clients.length} />
 
-        <StatsGrid stats={mockData.stats} />
+        <StatsGrid stats={stats} />
 
-        <AlertBanner alert={mockData.alert} />
+        <AlertBanner alert={alert} />
 
         <Tabs
-          tabs={mockData.tabs}
+          tabs={tabs}
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={(tab) => { setActiveTab(tab); setCurrentPage(1); }}
         />
 
         <FiltersBar
@@ -634,15 +731,25 @@ const AgentClients = () => {
           onSortChange={setSortBy}
         />
 
-        <div className={styles.clientsGrid}>
-          {mockData.clients.map((client) => (
-            <ClientCard key={client.id} client={client} />
-          ))}
-        </div>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+            Chargement des clients...
+          </div>
+        ) : paginatedClients.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+            {searchQuery ? 'Aucun client trouvé pour cette recherche.' : 'Aucun client pour le moment. Les prospects apparaîtront ici après vos premières visites.'}
+          </div>
+        ) : (
+          <div className={styles.clientsGrid}>
+            {paginatedClients.map((client) => (
+              <ClientCard key={client.id} client={client} />
+            ))}
+          </div>
+        )}
 
         <Pagination
           currentPage={currentPage}
-          totalPages={5}
+          totalPages={totalPages}
           onPageChange={setCurrentPage}
         />
       </div>
