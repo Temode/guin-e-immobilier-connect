@@ -13,7 +13,7 @@ import {
   formatVisitTime,
   formatCountdown,
 } from '@/services/agendaService';
-import { generateSmartRelance } from '@/services/aiAgentChatService';
+import { generateSmartRelance, scanConversationsForVisits, type ScanResult } from '@/services/aiAgentChatService';
 import styles from './AgentAgenda.module.css';
 
 /* ==========================================
@@ -165,6 +165,12 @@ const RefreshIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const SparklesIcon = ({ className }: { className?: string }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
+    <path fillRule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5zM18 1.5a.75.75 0 01.728.568l.258 1.036a2.63 2.63 0 001.91 1.91l1.036.258a.75.75 0 010 1.456l-1.036.258a2.63 2.63 0 00-1.91 1.91l-.258 1.036a.75.75 0 01-1.456 0l-.258-1.036a2.63 2.63 0 00-1.91-1.91l-1.036-.258a.75.75 0 010-1.456l1.036-.258a2.63 2.63 0 001.91-1.91l.258-1.036A.75.75 0 0118 1.5z" clipRule="evenodd" />
+  </svg>
+);
+
 /* ==========================================
    MOCK DATA — Fallback quand la base est vide
 ========================================== */
@@ -304,6 +310,7 @@ function dbVisitToDisplay(visit) {
     },
     eta: '',
     ai_prospect_score: visit.ai_prospect_score,
+    ai_suggested: visit.ai_suggested,
     scheduled_at: visit.scheduled_at,
   };
 }
@@ -335,7 +342,7 @@ function dbVisitToHero(visit) {
 /* ==========================================
    TOP BAR COMPONENT (design original préservé)
 ========================================== */
-const TopBar = ({ pendingCount, onNewVisit }) => {
+const TopBar = ({ pendingCount, onNewVisit, onScanIA, isScanning }) => {
   const now = new Date();
   const dateStr = now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const capitalizedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
@@ -355,6 +362,16 @@ const TopBar = ({ pendingCount, onNewVisit }) => {
         </div>
       </div>
       <div className={styles.topBarRight}>
+        <button
+          className={styles.iconBtn}
+          onClick={onScanIA}
+          disabled={isScanning}
+          title="Scan IA — Analyser les conversations et mettre à jour l'agenda"
+          style={{ color: isScanning ? 'var(--color-primary-500)' : undefined }}
+        >
+          <SparklesIcon />
+          {isScanning && <span className={styles.notificationBadge} style={{ background: 'var(--color-primary-500)' }}>...</span>}
+        </button>
         <button className={styles.iconBtn}>
           <NotificationIcon />
           {pendingCount > 0 && <span className={styles.notificationBadge}>{pendingCount}</span>}
@@ -533,7 +550,7 @@ const ViewControls = ({ activeTab, onTabChange, currentDate, viewMode, onViewMod
 /* ==========================================
    VISIT CARD COMPONENT (design original préservé)
 ========================================== */
-const VisitCard = ({ visit, onConfirm, onCancel, onRelance }) => {
+const VisitCard = ({ visit, onConfirm, onCancel, onRelance, onComplete }) => {
   const typeIcons = {
     visit: HomeIcon,
     'contre-visite': RefreshIcon,
@@ -564,6 +581,38 @@ const VisitCard = ({ visit, onConfirm, onCancel, onRelance }) => {
             <StatusIcon />
             {statusInfo.label}
           </span>
+          {visit.ai_prospect_score && visit.ai_prospect_score !== 'unknown' && (
+            <span style={{
+              fontSize: '0.7rem',
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: 12,
+              background: visit.ai_prospect_score === 'hot' ? '#fef2f2' : visit.ai_prospect_score === 'warm' ? '#fffbeb' : '#f0f9ff',
+              color: visit.ai_prospect_score === 'hot' ? '#dc2626' : visit.ai_prospect_score === 'warm' ? '#d97706' : '#0284c7',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 3,
+            }}>
+              {visit.ai_prospect_score === 'hot' ? '🔥' : visit.ai_prospect_score === 'warm' ? '🟡' : '❄️'}
+              {visit.ai_prospect_score === 'hot' ? 'Chaud' : visit.ai_prospect_score === 'warm' ? 'Tiède' : 'Froid'}
+            </span>
+          )}
+          {visit.ai_suggested && (
+            <span style={{
+              fontSize: '0.65rem',
+              fontWeight: 600,
+              padding: '2px 6px',
+              borderRadius: 12,
+              background: 'var(--color-primary-50, #ecfdf5)',
+              color: 'var(--color-primary-700, #047857)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 2,
+            }}>
+              <SparklesIcon className={styles.iconXs} />
+              ARIA
+            </span>
+          )}
         </div>
         <div className={styles.visitMenu}>
           <button className={styles.visitMenuBtn}>
@@ -574,6 +623,12 @@ const VisitCard = ({ visit, onConfirm, onCancel, onRelance }) => {
               <div className={styles.dropdownItem} onClick={() => onConfirm && onConfirm(visit.id)}>
                 <CheckIcon />
                 Confirmer
+              </div>
+            )}
+            {visit.id && visit.status === 'confirmed' && (
+              <div className={styles.dropdownItem} onClick={() => onComplete && onComplete(visit.id)}>
+                <CheckCircleIcon />
+                Terminer
               </div>
             )}
             <div className={styles.dropdownItem} onClick={() => onRelance && visit.id && onRelance(visit.id)}>
@@ -663,13 +718,13 @@ const VisitCard = ({ visit, onConfirm, onCancel, onRelance }) => {
 /* ==========================================
    TIMELINE COMPONENT (design original préservé)
 ========================================== */
-const Timeline = ({ visits, onConfirm, onCancel, onRelance }) => (
+const Timeline = ({ visits, onConfirm, onCancel, onRelance, onComplete }) => (
   <div className={styles.timeline}>
     {visits.map((visit, index) => (
       <div key={visit.id || index} className={styles.timelineItem}>
         <div className={styles.timelineTime}>{visit.time}</div>
         <div className={`${styles.timelineDot} ${styles[visit.type]} ${visit.status === 'pending' ? styles.pending : ''}`}></div>
-        <VisitCard visit={visit} onConfirm={onConfirm} onCancel={onCancel} onRelance={onRelance} />
+        <VisitCard visit={visit} onConfirm={onConfirm} onCancel={onCancel} onRelance={onRelance} onComplete={onComplete} />
       </div>
     ))}
   </div>
@@ -805,6 +860,10 @@ const AgentAgenda = () => {
   const [dbNextVisit, setDbNextVisit] = useState(null);
   const [dbStats, setDbStats] = useState(null);
 
+  // AI scan state
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanResults, setScanResults] = useState<ScanResult[] | null>(null);
+
   const loadData = useCallback(async () => {
     if (!user) return;
     try {
@@ -893,6 +952,31 @@ const AgentAgenda = () => {
     return { error };
   };
 
+  const handleComplete = async (visitId) => {
+    await updateVisitStatus(visitId, 'completed');
+    loadData();
+  };
+
+  const handleScanIA = async () => {
+    if (isScanning) return;
+    setIsScanning(true);
+    setScanResults(null);
+    try {
+      const { data, error } = await scanConversationsForVisits();
+      if (!error && data.length > 0) {
+        setScanResults(data);
+        // Reload visits to show newly created ones
+        loadData();
+      } else {
+        setScanResults([]);
+      }
+    } catch {
+      setScanResults([]);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
   const handleDateChange = (direction) => {
     const d = new Date(currentDate);
     if (activeTab === "Aujourd'hui") d.setDate(d.getDate() + direction);
@@ -903,9 +987,45 @@ const AgentAgenda = () => {
 
   return (
     <>
-      <TopBar pendingCount={pendingCount} onNewVisit={() => setIsNewVisitOpen(true)} />
+      <TopBar pendingCount={pendingCount} onNewVisit={() => setIsNewVisitOpen(true)} onScanIA={handleScanIA} isScanning={isScanning} />
 
       <div className={styles.pageContent}>
+        {/* AI Scan Results Banner */}
+        {scanResults !== null && (
+          <div style={{
+            padding: '12px 16px',
+            borderRadius: 'var(--radius-lg, 12px)',
+            background: scanResults.length > 0 ? 'var(--color-primary-50, #ecfdf5)' : 'var(--color-neutral-50, #f9fafb)',
+            border: `1px solid ${scanResults.length > 0 ? 'var(--color-primary-200, #a7f3d0)' : 'var(--color-neutral-200, #e5e7eb)'}`,
+            marginBottom: 16,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            fontSize: '0.875rem',
+          }}>
+            <SparklesIcon className={styles.iconSm} />
+            {scanResults.length > 0 ? (
+              <div>
+                <strong>Scan ARIA terminé</strong> — {scanResults.length} conversation(s) analysée(s)
+                {scanResults.filter(r => r.visitCreated).length > 0 && (
+                  <span style={{ color: 'var(--color-primary-700)' }}> — {scanResults.filter(r => r.visitCreated).length} visite(s) créée(s)</span>
+                )}
+                {scanResults.filter(r => r.visitUpdated).length > 0 && (
+                  <span> — {scanResults.filter(r => r.visitUpdated).length} mise(s) à jour</span>
+                )}
+                {scanResults.filter(r => r.analysis.prospect_score === 'hot').length > 0 && (
+                  <span style={{ color: '#dc2626' }}> — 🔥 {scanResults.filter(r => r.analysis.prospect_score === 'hot').length} prospect(s) chaud(s)</span>
+                )}
+              </div>
+            ) : (
+              <span>Aucune nouvelle opportunité détectée. Les conversations seront re-scannées automatiquement.</span>
+            )}
+            <button onClick={() => setScanResults(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+              <XIcon />
+            </button>
+          </div>
+        )}
+
         {/* Hero Card - Prochain RDV */}
         <HeroNextRdv nextRdv={displayNextRdv} />
 
@@ -926,7 +1046,7 @@ const AgentAgenda = () => {
         />
 
         {/* Timeline */}
-        <Timeline visits={displayVisits} onConfirm={handleConfirm} onCancel={handleCancel} onRelance={handleRelance} />
+        <Timeline visits={displayVisits} onConfirm={handleConfirm} onCancel={handleCancel} onRelance={handleRelance} onComplete={handleComplete} />
       </div>
 
       {/* Floating Action Button */}
