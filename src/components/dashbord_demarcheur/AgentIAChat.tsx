@@ -12,47 +12,65 @@ import {
 } from '@/services/aiAgentChatService';
 import styles from './AgentIAChat.module.css';
 
-/* ─── Quick-prompt suggestions ─── */
+/* ─── Welcome suggestion cards ─── */
+const SUGGESTIONS = [
+  {
+    icon: '📋',
+    title: 'Rapport du jour',
+    desc: 'Visites, prospects et actions prioritaires',
+    action: '__DAILY_REPORT__',
+  },
+  {
+    icon: '🔥',
+    title: 'Prospects chauds',
+    desc: 'Qui est prêt à signer ?',
+    action: 'Analyse mes prospects actuels et identifie ceux qui sont prêts à signer.',
+  },
+  {
+    icon: '✉️',
+    title: 'Relance prospect',
+    desc: 'Message pro multi-canal',
+    action: 'Rédige un message de relance professionnel pour un prospect qui n\'a pas répondu depuis 3 jours.',
+  },
+  {
+    icon: '💡',
+    title: 'Conseils',
+    desc: 'Améliorer mes conversions',
+    action: 'Quelles sont tes recommandations pour améliorer mon taux de conversion cette semaine ?',
+  },
+];
+
+/* ─── Quick-prompt chips (shown in chat mode) ─── */
 const QUICK_PROMPTS = [
-  { label: '📋 Rapport du matin', text: '__DAILY_REPORT__' },
-  { label: '🔥 Prospects chauds', text: 'Analyse mes prospects actuels et identifie ceux qui sont prêts à signer.' },
-  { label: '✉️ Message de relance', text: 'Rédige un message de relance professionnel pour un prospect qui n\'a pas répondu depuis 3 jours.' },
-  { label: '📊 Stats semaine', text: 'Donne-moi un bilan de mes performances de la semaine : visites, signatures, taux de conversion.' },
-  { label: '💡 Conseils', text: 'Quelles sont tes recommandations pour améliorer mon taux de conversion cette semaine ?' },
+  { label: '📋 Rapport', text: '__DAILY_REPORT__' },
+  { label: '🔥 Prospects', text: 'Analyse mes prospects actuels et identifie ceux qui sont prêts à signer.' },
+  { label: '✉️ Relance', text: 'Rédige un message de relance professionnel pour un prospect qui n\'a pas répondu depuis 3 jours.' },
+  { label: '📊 Stats', text: 'Donne-moi un bilan de mes performances de la semaine : visites, signatures, taux de conversion.' },
+  { label: '📅 Agenda', text: 'Montre-moi mon agenda du jour et les visites prévues.' },
 ];
 
-/* ─── Welcome suggestion chips ─── */
-const WELCOME_CHIPS = [
-  'Rapport du matin',
-  'Analyser mes prospects',
-  'Rédiger une relance',
-  'Conseils de la semaine',
-];
-
-/* ─── Format time ─── */
+/* ─── Helpers ─── */
 function fmtTime(isoStr: string): string {
   return new Date(isoStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
-/* ─── Model label ─── */
-function modelLabel(model: string): string {
-  if (!model) return '';
-  if (model.includes('claude-sonnet-thinking')) return 'Claude Sonnet (Thinking)';
-  if (model.includes('claude-sonnet')) return 'Claude Sonnet';
-  if (model.includes('gemini-flash')) return 'Gemini Flash';
-  return model;
-}
-
 /* ─── SVG Icons ─── */
+const AriaIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z" />
+  </svg>
+);
+
 const SendIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
     <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
   </svg>
 );
 
-const SparkleIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
-    <path fillRule="evenodd" d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5z" clipRule="evenodd" />
+const ScanIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+    <path d="M21 3v5h-5" />
   </svg>
 );
 
@@ -69,7 +87,6 @@ export default function AgentIAChat() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
-  const [useAdvanced, setUseAdvanced] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [usage, setUsage] = useState<AIUsage | null>(null);
@@ -78,6 +95,7 @@ export default function AgentIAChat() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const agentName = profile?.full_name || user?.user_metadata?.full_name || user?.email || 'Agent';
+  const firstName = agentName.includes('@') ? 'Agent' : agentName.split(' ')[0];
   const initials = agentName.includes('@')
     ? '?'
     : agentName.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
@@ -125,18 +143,17 @@ export default function AgentIAChat() {
     if (data) setUsage(data);
   }, []);
 
-  /* Handle daily report (special quick prompt) */
+  /* Handle daily report */
   const handleDailyReport = useCallback(async () => {
     if (isLoading) return;
     setError(null);
     setIsTyping(true);
     setIsLoading(true);
 
-    // Add a user message
     const tempUserMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       role: 'user',
-      content: 'Génère mon rapport d\'activité du matin',
+      content: 'Génère mon rapport d\'activité du jour',
       created_at: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, tempUserMsg]);
@@ -145,7 +162,7 @@ export default function AgentIAChat() {
       const { data, error: apiError } = await generateDailyReport();
 
       if (apiError || !data) {
-        setError(apiError?.message || 'Erreur lors de la génération du rapport.');
+        setError(apiError?.message || 'Impossible de générer le rapport.');
         return;
       }
 
@@ -154,7 +171,7 @@ export default function AgentIAChat() {
         role: 'assistant',
         content: data.report,
         created_at: new Date().toISOString(),
-        metadata: { model: 'claude-sonnet-thinking', tokens_used: data.tokensUsed, type: 'daily_report' },
+        metadata: { tokens_used: data.tokensUsed, type: 'daily_report' },
       };
 
       setMessages((prev) => {
@@ -166,18 +183,18 @@ export default function AgentIAChat() {
       refreshUsage();
     } catch (err) {
       console.error('[ARIA] handleDailyReport error:', err);
-      setError(err instanceof Error ? err.message : 'Erreur inattendue lors de la génération du rapport.');
+      setError('Une erreur est survenue. Réessayez.');
     } finally {
       setIsTyping(false);
       setIsLoading(false);
     }
   }, [isLoading, refreshUsage]);
 
+  /* Handle send message */
   const handleSend = useCallback(async (overrideText?: string) => {
     const text = (overrideText ?? input).trim();
     if (!text || isLoading) return;
 
-    // Handle special daily report trigger
     if (text === '__DAILY_REPORT__') {
       handleDailyReport();
       return;
@@ -187,7 +204,6 @@ export default function AgentIAChat() {
     setInput('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
 
-    // Optimistic user message
     const tempUserMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       role: 'user',
@@ -199,51 +215,46 @@ export default function AgentIAChat() {
     setIsLoading(true);
 
     try {
-      // Auto-detect write requests → force advanced mode for reliable action execution
-      const writeKeywords = /\b(ajouter|ajout|créer|crée|cr[ée]{2}|planifier|planifie|modifier|modifie|déplacer|déplace|supprimer|supprime|annuler|annule|mettre.*agenda|placer.*agenda|dans.*l.agenda|dans.*agenda|nouveau.*client|ajouter.*client)\b/i;
-      const forceAdvanced = useAdvanced || writeKeywords.test(text);
+      // Auto-detect write/strategic requests
+      const writeKeywords = /\b(ajouter|ajout|créer|crée|planifier|planifie|modifier|modifie|déplacer|déplace|supprimer|supprime|annuler|annule|mettre.*agenda|placer.*agenda|dans.*l.agenda|dans.*agenda|nouveau.*client|ajouter.*client|analyse|rapport|scoring|stratégi)\b/i;
+      const forceAdvanced = writeKeywords.test(text);
 
       const { data, error: apiError } = await sendMessageToAria(text, forceAdvanced);
 
       if (apiError || !data) {
-        setError(apiError?.message || 'Erreur lors de la communication avec ARIA.');
+        setError(apiError?.message || 'ARIA n\'a pas pu répondre. Réessayez.');
         return;
       }
 
-      // Build response with action results if any
+      // Build response content
       let responseContent = data.message;
       if (data.actionsExecuted?.length) {
-        responseContent += '\n\n---\n📌 **Actions exécutées :**\n' + data.actionsExecuted.join('\n');
+        responseContent += '\n\n' + data.actionsExecuted.join('\n');
       }
 
-      // Add assistant response
       const assistantMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         role: 'assistant',
         content: responseContent,
         created_at: new Date().toISOString(),
-        metadata: { model: data.model, tokens_used: data.tokensUsed },
+        metadata: { tokens_used: data.tokensUsed },
       };
 
-      // Replace temp user message + add assistant (history already saved server-side)
       setMessages((prev) => {
         const withoutTemp = prev.filter((m) => m.id !== tempUserMsg.id);
-        const realUserMsg: ChatMessage = {
-          ...tempUserMsg,
-          id: `u-${Date.now()}`,
-        };
+        const realUserMsg: ChatMessage = { ...tempUserMsg, id: `u-${Date.now()}` };
         return [...withoutTemp, realUserMsg, assistantMsg];
       });
 
       refreshUsage();
     } catch (err) {
       console.error('[ARIA] handleSend error:', err);
-      setError(err instanceof Error ? err.message : 'Erreur inattendue lors de la communication avec ARIA.');
+      setError('Une erreur est survenue. Réessayez.');
     } finally {
       setIsTyping(false);
       setIsLoading(false);
     }
-  }, [input, isLoading, useAdvanced, handleDailyReport, refreshUsage]);
+  }, [input, isLoading, handleDailyReport, refreshUsage]);
 
   const handleQuickPrompt = (text: string) => {
     if (text === '__DAILY_REPORT__') {
@@ -255,17 +266,9 @@ export default function AgentIAChat() {
   };
 
   const handleClear = async () => {
-    if (!window.confirm('Effacer tout l\'historique de conversation avec ARIA ?')) return;
+    if (!window.confirm('Effacer l\'historique de conversation ?')) return;
     await clearChatHistory();
     setMessages([]);
-  };
-
-  const handleToggleAdvanced = () => {
-    if (!useAdvanced && usage?.limit_reached) {
-      setError('Limite de crédits Claude atteinte ce mois-ci. Utilisez le mode Rapide (Gemini Flash).');
-      return;
-    }
-    setUseAdvanced((v) => !v);
   };
 
   const showWelcome = historyLoaded && messages.length === 0 && !isTyping;
@@ -274,73 +277,53 @@ export default function AgentIAChat() {
     <div className={styles.page}>
       {/* ─── Header ─── */}
       <div className={styles.header}>
-        <div className={styles.ariaAvatar}>✨</div>
-        <div className={styles.ariaInfo}>
-          <h1 className={styles.ariaName}>ARIA — Assistante IA</h1>
-          <span className={styles.ariaStatus}>En ligne · Dual AI (Gemini Flash + Claude)</span>
+        <div className={styles.ariaAvatar}>
+          <AriaIcon />
         </div>
-
-        {/* Usage counter */}
-        {usage && (
-          <div
-            className={styles.usageCounter}
-            title={`${usage.advanced_used}/${usage.advanced_limit} messages Claude avancés utilisés ce mois`}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '4px 10px',
-              borderRadius: 20,
-              fontSize: '0.75rem',
-              fontWeight: 600,
-              background: usage.limit_reached ? 'var(--color-error-50, #fef2f2)' : 'var(--color-neutral-50, #f9fafb)',
-              color: usage.limit_reached ? 'var(--color-error-600, #dc2626)' : 'var(--color-neutral-600, #4b5563)',
-              border: `1px solid ${usage.limit_reached ? 'var(--color-error-200, #fecaca)' : 'var(--color-neutral-200, #e5e7eb)'}`,
-            }}
-          >
-            <span>{usage.limit_reached ? '🚫' : '⚡'}</span>
-            <span>{usage.advanced_used}/{usage.advanced_limit}</span>
-          </div>
-        )}
-
-        {/* Model toggle */}
-        <button
-          className={`${styles.modelToggle} ${useAdvanced ? styles.advanced : ''}`}
-          onClick={handleToggleAdvanced}
-          title={useAdvanced ? 'Mode Stratégique (Claude Sonnet) — cliquer pour basculer' : 'Mode Rapide (Gemini Flash) — cliquer pour basculer'}
-        >
-          <SparkleIcon />
-          <span>{useAdvanced ? 'Stratégique' : 'Rapide'}</span>
-        </button>
-
-        {/* Clear history */}
-        <button
-          className={`${styles.btnIcon} ${styles.danger}`}
-          onClick={handleClear}
-          title="Effacer l'historique"
-        >
-          <TrashIcon />
-        </button>
-      </div>
-
-      {/* ─── Quick prompts bar ─── */}
-      <div className={styles.quickBar}>
-        {QUICK_PROMPTS.map((qp) => (
+        <div className={styles.ariaInfo}>
+          <h1 className={styles.ariaName}>ARIA</h1>
+          <span className={styles.ariaStatus}>En ligne</span>
+        </div>
+        <div className={styles.headerActions}>
           <button
-            key={qp.label}
-            className={styles.quickBtn}
-            onClick={() => handleQuickPrompt(qp.text)}
+            className={styles.btnIcon}
+            onClick={() => handleQuickPrompt('[SCAN IA CONVERSATIONS]')}
+            title="Scanner les conversations"
             disabled={isLoading}
           >
-            {qp.label}
+            <ScanIcon />
           </button>
-        ))}
+          <button
+            className={`${styles.btnIcon} ${styles.danger}`}
+            onClick={handleClear}
+            title="Effacer l'historique"
+          >
+            <TrashIcon />
+          </button>
+        </div>
       </div>
+
+      {/* ─── Quick prompts bar (only when in chat) ─── */}
+      {!showWelcome && (
+        <div className={styles.quickBar}>
+          {QUICK_PROMPTS.map((qp) => (
+            <button
+              key={qp.label}
+              className={styles.quickBtn}
+              onClick={() => handleQuickPrompt(qp.text)}
+              disabled={isLoading}
+            >
+              {qp.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ─── Error banner ─── */}
       {error && (
         <div className={styles.errorBanner}>
-          ⚠️ {error}
+          <span>&#9888;&#65039; {error}</span>
+          <button onClick={() => setError(null)}>&#10005;</button>
         </div>
       )}
 
@@ -348,23 +331,23 @@ export default function AgentIAChat() {
       <div className={styles.messagesArea}>
         {showWelcome ? (
           <div className={styles.welcomeState}>
-            <div className={styles.welcomeIcon}>✨</div>
-            <h2>Bonjour {agentName.split(' ')[0]} !</h2>
-            <p>
-              Je suis <strong>ARIA</strong>, votre assistante IA dédiée propulsée par Gemini Flash & Claude Sonnet. Je connais votre agenda,
-              vos prospects et le marché immobilier guinéen. Comment puis-je vous aider aujourd'hui ?
+            <div className={styles.welcomeAvatarLarge}>
+              <AriaIcon />
+            </div>
+            <h2 className={styles.welcomeTitle}>Bonjour {firstName} !</h2>
+            <p className={styles.welcomeSubtitle}>
+              Je suis <strong>ARIA</strong>, ton assistante personnelle. Agenda, prospects, relances — je gère tout pour toi.
             </p>
-            <div className={styles.welcomeSuggestions}>
-              {WELCOME_CHIPS.map((chip) => (
+            <div className={styles.suggestionsGrid}>
+              {SUGGESTIONS.map((s) => (
                 <button
-                  key={chip}
-                  className={styles.suggestionChip}
-                  onClick={() => {
-                    const found = QUICK_PROMPTS.find((q) => q.label.includes(chip.split(' ')[0]));
-                    handleQuickPrompt(found ? found.text : chip);
-                  }}
+                  key={s.title}
+                  className={styles.suggestionCard}
+                  onClick={() => handleQuickPrompt(s.action)}
                 >
-                  {chip}
+                  <span className={styles.suggestionCardIcon}>{s.icon}</span>
+                  <span className={styles.suggestionCardTitle}>{s.title}</span>
+                  <span className={styles.suggestionCardDesc}>{s.desc}</span>
                 </button>
               ))}
             </div>
@@ -376,9 +359,10 @@ export default function AgentIAChat() {
                 key={msg.id}
                 className={`${styles.messageRow} ${msg.role === 'user' ? styles.user : styles.assistant}`}
               >
-                {/* Avatar */}
                 {msg.role === 'assistant' && (
-                  <div className={`${styles.bubbleAvatar} ${styles.aria}`}>✨</div>
+                  <div className={`${styles.bubbleAvatar} ${styles.aria}`}>
+                    <AriaIcon />
+                  </div>
                 )}
 
                 <div>
@@ -387,9 +371,6 @@ export default function AgentIAChat() {
                   </div>
                   <span className={styles.bubbleMeta}>
                     {fmtTime(msg.created_at)}
-                    {msg.role === 'assistant' && msg.metadata?.model && (
-                      <> · {modelLabel(msg.metadata.model)}</>
-                    )}
                   </span>
                 </div>
 
@@ -402,7 +383,9 @@ export default function AgentIAChat() {
             {/* Typing indicator */}
             {isTyping && (
               <div className={styles.typingRow}>
-                <div className={`${styles.bubbleAvatar} ${styles.aria}`}>✨</div>
+                <div className={`${styles.bubbleAvatar} ${styles.aria}`}>
+                  <AriaIcon />
+                </div>
                 <div className={styles.typingBubble}>
                   <span className={styles.typingDot} />
                   <span className={styles.typingDot} />
@@ -422,7 +405,7 @@ export default function AgentIAChat() {
             ref={textareaRef}
             className={styles.textarea}
             rows={1}
-            placeholder="Écrivez un message à ARIA… (Entrée pour envoyer)"
+            placeholder="Message à ARIA..."
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
@@ -438,9 +421,7 @@ export default function AgentIAChat() {
           </button>
         </div>
         <p className={styles.inputHint}>
-          Mode : {useAdvanced ? '⚡ Stratégique (Claude Sonnet)' : '🚀 Rapide (Gemini Flash)'}
-          {usage && ` · ${usage.advanced_used}/${usage.advanced_limit} avancés`}
-          {' '}· Maj+Entrée pour saut de ligne
+          Entrée pour envoyer · Maj+Entrée pour saut de ligne
         </p>
       </div>
     </div>
