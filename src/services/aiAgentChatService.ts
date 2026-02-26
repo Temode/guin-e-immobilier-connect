@@ -1,6 +1,17 @@
 import { supabase } from '@/integrations/supabase/client';
 
-/* ── Claude API config ── */
+/* ══════════════════════════════════════════
+   DUAL AI CONFIG
+   ─ Gemini Flash : chat quotidien, relances, résumés (rapide, économique)
+   ─ Claude Sonnet : analyse stratégique, scoring, rapports (intelligent, thinking)
+   ══════════════════════════════════════════ */
+
+/* ── Gemini Flash (IA légère) ── */
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+/* ── Claude Sonnet (IA avancée) ── */
 const CLAUDE_API_KEY = import.meta.env.VITE_CLAUDE_API_KEY || '';
 const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages';
 const CLAUDE_MODEL = 'claude-sonnet-4-5-20250929';
@@ -16,7 +27,7 @@ IDENTITÉ & PERSONNALITÉ
 ═══════════════════════════════════════
 - Nom : ARIA (Assistant en Recherche Immobilière et Analyse)
 - Plateforme : Guin-e Immobilier Connect — SaaS immobilier pour la Guinée
-- Moteur IA : Claude (Sonnet pour les réponses rapides, Réflexion approfondie pour les analyses stratégiques)
+- Moteur IA : Dual AI — Gemini Flash pour les réponses rapides, Claude Sonnet pour les analyses stratégiques
 - Tu es chaleureuse, professionnelle, directe et orientée action
 - Tu tutoies l'agent (c'est ton collègue proche) mais vouvoies les prospects dans les messages générés
 - Tu utilises des emojis avec modération pour rendre tes réponses lisibles
@@ -233,10 +244,59 @@ export interface ScanResult {
   visitUpdated: boolean;
 }
 
-/* ──────────────────────────────────────────
-   Helper: call Claude API (Anthropic Messages)
-   Supports extended thinking for advanced mode
-   ────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════
+   GEMINI FLASH — IA légère (chat quotidien, relances)
+   Rapide, économique, usage fréquent
+   ══════════════════════════════════════════════════════ */
+async function callGeminiFlash(
+  systemPrompt: string,
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  maxTokens = 1024,
+): Promise<{ text: string; tokensUsed: number }> {
+  if (!GEMINI_API_KEY) {
+    throw new Error('Clé API Gemini non configurée. Ajoutez VITE_GEMINI_API_KEY dans votre fichier .env');
+  }
+
+  // Convert messages to Gemini format
+  const contents = [
+    { role: 'user', parts: [{ text: systemPrompt }] },
+    { role: 'model', parts: [{ text: 'Compris. Je suis ARIA, prête à aider.' }] },
+    ...messages.map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    })),
+  ];
+
+  const res = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents,
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        temperature: 0.7,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Erreur Gemini Flash (${res.status}): ${errText.slice(0, 300)}`);
+  }
+
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const tokensUsed =
+    (data.usageMetadata?.promptTokenCount || 0) +
+    (data.usageMetadata?.candidatesTokenCount || 0);
+
+  return { text, tokensUsed };
+}
+
+/* ══════════════════════════════════════════════════════
+   CLAUDE SONNET — IA avancée (analyse, scoring, rapports)
+   Extended thinking pour les analyses stratégiques
+   ══════════════════════════════════════════════════════ */
 async function callClaude(
   systemPrompt: string,
   messages: Array<{ role: 'user' | 'assistant'; content: string }>,
@@ -275,7 +335,7 @@ async function callClaude(
 
   if (!res.ok) {
     const errText = await res.text();
-    throw new Error(`Erreur de l'API Claude (${res.status}): ${errText.slice(0, 300)}`);
+    throw new Error(`Erreur Claude Sonnet (${res.status}): ${errText.slice(0, 300)}`);
   }
 
   const data = await res.json();
@@ -297,9 +357,58 @@ async function callClaude(
 }
 
 /* ──────────────────────────────────────────
-   Helper: parse JSON from Claude response
+   Smart AI Router — Choisit le bon modèle
+   avec fallback automatique
    ────────────────────────────────────────── */
-function parseClaudeJSON<T>(rawText: string, fallback: T): T {
+type AITask = 'chat' | 'chat-advanced' | 'relance' | 'analysis' | 'report' | 'scan';
+
+async function callAI(
+  task: AITask,
+  systemPrompt: string,
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  maxTokens = 1024,
+): Promise<{ text: string; tokensUsed: number; model: string }> {
+  const useAdvanced = task === 'chat-advanced' || task === 'analysis' || task === 'report' || task === 'scan';
+  const useThinking = task === 'analysis' || task === 'report' || task === 'scan';
+
+  // Strategy: advanced tasks → Claude, light tasks → Gemini Flash
+  if (useAdvanced) {
+    // Try Claude first for advanced tasks
+    try {
+      const result = await callClaude(systemPrompt, messages, maxTokens, useThinking);
+      return { ...result, model: useThinking ? 'claude-sonnet-thinking' : 'claude-sonnet' };
+    } catch (claudeErr) {
+      // Fallback to Gemini Flash if Claude fails
+      console.warn('[ARIA] Claude failed, falling back to Gemini Flash:', claudeErr);
+      try {
+        const result = await callGeminiFlash(systemPrompt, messages, maxTokens);
+        return { ...result, model: 'gemini-flash-fallback' };
+      } catch {
+        throw claudeErr; // Throw original Claude error if both fail
+      }
+    }
+  } else {
+    // Try Gemini Flash first for light tasks
+    try {
+      const result = await callGeminiFlash(systemPrompt, messages, maxTokens);
+      return { ...result, model: 'gemini-flash' };
+    } catch (geminiErr) {
+      // Fallback to Claude if Gemini fails
+      console.warn('[ARIA] Gemini Flash failed, falling back to Claude:', geminiErr);
+      try {
+        const result = await callClaude(systemPrompt, messages, maxTokens, false);
+        return { ...result, model: 'claude-sonnet-fallback' };
+      } catch {
+        throw geminiErr; // Throw original Gemini error if both fail
+      }
+    }
+  }
+}
+
+/* ──────────────────────────────────────────
+   Helper: parse JSON from AI response
+   ────────────────────────────────────────── */
+function parseAIJSON<T>(rawText: string, fallback: T): T {
   try {
     const cleaned = rawText
       .replace(/```json\n?/g, '')
@@ -327,6 +436,9 @@ async function saveToHistory(userId: string, userMsg: string, assistantMsg: stri
 
 /* ──────────────────────────────────────────
    Helper: build rich context for ARIA
+   Injecte TOUTES les données plateforme en
+   lecture pour que l'IA puisse répondre sur
+   les prospects, biens, conversations, etc.
    ────────────────────────────────────────── */
 async function buildAgentContext(userId: string, agentName: string): Promise<string> {
   const now = new Date();
@@ -335,11 +447,11 @@ async function buildAgentContext(userId: string, agentName: string): Promise<str
 
   parts.push(`[CONTEXTE: ${now.toLocaleString('fr-FR', { timeZone: 'Africa/Conakry' })} — Agent: ${agentName}]`);
 
-  // Fetch today's visits
+  // ── 1. AGENDA : Visites du jour ──
   try {
     const { data: visits } = await supabase
       .from('visits')
-      .select('lead_name, type, status, scheduled_at, ai_prospect_score')
+      .select('lead_name, lead_phone, lead_notes, type, status, scheduled_at, address, ai_prospect_score, property:property_id(title, city)')
       .gte('scheduled_at', `${todayStr}T00:00:00`)
       .lte('scheduled_at', `${todayStr}T23:59:59`)
       .neq('status', 'cancelled')
@@ -347,7 +459,7 @@ async function buildAgentContext(userId: string, agentName: string): Promise<str
 
     if (visits?.length) {
       parts.push(`[AGENDA DU JOUR: ${visits.map(v =>
-        `${new Date(v.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} ${v.lead_name} (${v.type}, ${v.status}${v.ai_prospect_score !== 'unknown' ? `, ${v.ai_prospect_score}` : ''})`
+        `${new Date(v.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} ${v.lead_name} (${v.type}, ${v.status}${v.ai_prospect_score !== 'unknown' ? `, score:${v.ai_prospect_score}` : ''}) — ${v.property?.title || v.address || 'Lieu non précisé'}${v.lead_notes ? ` — Notes: ${v.lead_notes}` : ''}`
       ).join(' | ')}]`);
     } else {
       parts.push('[AGENDA DU JOUR: Aucune visite prévue]');
@@ -356,7 +468,134 @@ async function buildAgentContext(userId: string, agentName: string): Promise<str
     // Tables not ready
   }
 
-  // Fetch pending visits count
+  // ── 2. TOUS LES PROSPECTS : Visites à venir (prochains 30 jours) ──
+  try {
+    const in30days = new Date(now);
+    in30days.setDate(in30days.getDate() + 30);
+
+    const { data: allVisits } = await supabase
+      .from('visits')
+      .select('lead_name, lead_phone, lead_email, lead_notes, type, status, scheduled_at, address, ai_prospect_score, follow_up_required, relance_sent_at, property:property_id(title, city, type, price)')
+      .gte('scheduled_at', now.toISOString())
+      .lte('scheduled_at', in30days.toISOString())
+      .neq('status', 'cancelled')
+      .order('scheduled_at');
+
+    if (allVisits?.length) {
+      const hot = allVisits.filter(v => v.ai_prospect_score === 'hot');
+      const warm = allVisits.filter(v => v.ai_prospect_score === 'warm');
+      const cold = allVisits.filter(v => v.ai_prospect_score === 'cold');
+      const pending = allVisits.filter(v => v.status === 'pending');
+      const needsRelance = allVisits.filter(v => v.follow_up_required && !v.relance_sent_at);
+
+      parts.push(`[PROSPECTS — ${allVisits.length} visite(s) à venir :`);
+      if (hot.length) parts.push(`  🔥 CHAUDS (${hot.length}): ${hot.map(v => `${v.lead_name} (${v.type}, ${new Date(v.scheduled_at).toLocaleDateString('fr-FR')})${v.lead_phone ? ` tel:${v.lead_phone}` : ''}${v.lead_notes ? ` — ${v.lead_notes}` : ''}${v.property ? ` — Bien: ${v.property.title} ${v.property.city} ${v.property.price?.toLocaleString('fr-FR')} GNF` : ''}`).join(' | ')}`);
+      if (warm.length) parts.push(`  🟡 TIÈDES (${warm.length}): ${warm.map(v => `${v.lead_name} (${v.type}, ${new Date(v.scheduled_at).toLocaleDateString('fr-FR')})${v.lead_notes ? ` — ${v.lead_notes}` : ''}${v.property ? ` — Bien: ${v.property.title} ${v.property.city}` : ''}`).join(' | ')}`);
+      if (cold.length) parts.push(`  ❄️ FROIDS (${cold.length}): ${cold.map(v => `${v.lead_name} (${v.type})`).join(', ')}`);
+      if (pending.length) parts.push(`  ⏳ EN ATTENTE CONFIRMATION (${pending.length}): ${pending.map(v => v.lead_name).join(', ')}`);
+      if (needsRelance.length) parts.push(`  📩 À RELANCER (${needsRelance.length}): ${needsRelance.map(v => v.lead_name).join(', ')}`);
+      parts.push(']');
+    }
+  } catch {
+    // Tables not ready
+  }
+
+  // ── 3. CONVERSATIONS RÉCENTES avec prospects/locataires ──
+  try {
+    // Get conversations where this agent participates
+    const { data: participations } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('user_id', userId);
+
+    if (participations?.length) {
+      const convIds = participations.map(p => p.conversation_id);
+
+      // For each conversation, get recent messages + other participant name
+      const conversationSummaries: string[] = [];
+      for (const convId of convIds.slice(0, 8)) { // Limit to 8 conversations
+        // Get the other participant
+        const { data: otherParticipants } = await supabase
+          .from('conversation_participants')
+          .select('user_id')
+          .eq('conversation_id', convId)
+          .neq('user_id', userId);
+
+        let otherName = 'Inconnu';
+        if (otherParticipants?.[0]?.user_id) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', otherParticipants[0].user_id)
+            .single();
+          otherName = profile?.full_name || 'Inconnu';
+        }
+
+        // Get last 6 messages of this conversation
+        const { data: msgs } = await supabase
+          .from('messages')
+          .select('sender_id, content, created_at')
+          .eq('conversation_id', convId)
+          .order('created_at', { ascending: false })
+          .limit(6);
+
+        if (msgs?.length) {
+          const formatted = msgs.reverse().map(m => {
+            const who = m.sender_id === userId ? 'Agent' : otherName;
+            return `[${new Date(m.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}] ${who}: ${m.content.slice(0, 200)}`;
+          }).join('\n    ');
+
+          conversationSummaries.push(`  💬 ${otherName}:\n    ${formatted}`);
+        }
+      }
+
+      if (conversationSummaries.length) {
+        parts.push(`[CONVERSATIONS RÉCENTES (${conversationSummaries.length}):\n${conversationSummaries.join('\n')}\n]`);
+      }
+    }
+  } catch {
+    // Tables not ready
+  }
+
+  // ── 4. BIENS IMMOBILIERS de l'agent ──
+  try {
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('id, title, type, transaction_type, price, currency, city, commune, quartier, bedrooms, bathrooms, area, furnished, status, amenities')
+      .eq('owner_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (properties?.length) {
+      parts.push(`[BIENS DE L'AGENT (${properties.length}):\n${properties.map(p =>
+        `  🏠 ${p.title} — ${p.type} ${p.transaction_type === 'rent' ? 'Location' : 'Vente'} — ${p.price?.toLocaleString('fr-FR')} ${p.currency || 'GNF'} — ${p.city}${p.commune ? `/${p.commune}` : ''}${p.quartier ? `/${p.quartier}` : ''} — ${p.bedrooms || '?'}ch/${p.bathrooms || '?'}sdb${p.area ? `/${p.area}m²` : ''} — ${p.furnished ? 'Meublé' : 'Non meublé'} — Statut: ${p.status}${(p.amenities as string[])?.length ? ` — Commodités: ${(p.amenities as string[]).join(', ')}` : ''}`
+      ).join('\n')}\n]`);
+    } else {
+      parts.push('[BIENS DE L\'AGENT: Aucun bien enregistré]');
+    }
+  } catch {
+    // Tables not ready
+  }
+
+  // ── 5. LOCATIONS ACTIVES ──
+  try {
+    const { data: rentals } = await supabase
+      .from('rentals')
+      .select('rent_amount, currency, start_date, end_date, status, payment_method, property:property_id(title, city), tenant:tenant_id(full_name)')
+      .or(`owner_id.eq.${userId},agent_id.eq.${userId}`)
+      .eq('status', 'active')
+      .limit(10);
+
+    if (rentals?.length) {
+      parts.push(`[LOCATIONS ACTIVES (${rentals.length}):\n${rentals.map(r =>
+        `  🔑 ${(r.property as any)?.title || 'Bien'} — Locataire: ${(r.tenant as any)?.full_name || '?'} — ${r.rent_amount?.toLocaleString('fr-FR')} ${r.currency || 'GNF'}/mois — Depuis: ${r.start_date} — Paiement: ${r.payment_method || 'non défini'}`
+      ).join('\n')}\n]`);
+    }
+  } catch {
+    // Tables not ready
+  }
+
+  // ── 6. ALERTES ──
   try {
     const { data: pending } = await supabase
       .from('visits')
@@ -364,8 +603,18 @@ async function buildAgentContext(userId: string, agentName: string): Promise<str
       .eq('status', 'pending')
       .gte('scheduled_at', now.toISOString());
 
-    if (pending?.length) {
-      parts.push(`[ALERTES: ${pending.length} visite(s) en attente de confirmation]`);
+    const { data: unread } = await supabase
+      .from('notifications')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('read', false);
+
+    const alerts: string[] = [];
+    if (pending?.length) alerts.push(`${pending.length} visite(s) en attente de confirmation`);
+    if (unread?.length) alerts.push(`${unread.length} notification(s) non lue(s)`);
+
+    if (alerts.length) {
+      parts.push(`[ALERTES: ${alerts.join(' | ')}]`);
     }
   } catch {
     // Tables not ready
@@ -376,9 +625,8 @@ async function buildAgentContext(userId: string, agentName: string): Promise<str
 
 /* ══════════════════════════════════════════════════════
    Chat — Envoyer un message à ARIA
-   Appelle Claude API avec contexte enrichi
-   Mode standard : Claude Sonnet
-   Mode avancé : Claude Sonnet + Extended Thinking
+   Mode standard → Gemini Flash (rapide, économique)
+   Mode avancé → Claude Sonnet + Extended Thinking
    ══════════════════════════════════════════════════════ */
 export async function sendMessageToAria(
   message: string,
@@ -388,7 +636,6 @@ export async function sendMessageToAria(
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: null, error: new Error('Non authentifié — veuillez vous reconnecter.') };
 
-    const modelLabel = useAdvancedModel ? 'claude-sonnet-thinking' : 'claude-sonnet';
     const agentName = user.user_metadata?.full_name || user.email || 'Agent';
 
     // Load recent history for context (last 10 messages)
@@ -414,17 +661,18 @@ export async function sendMessageToAria(
     // Build rich context
     const contextSuffix = await buildAgentContext(user.id, agentName);
 
-    // Build messages array for Claude
+    // Build messages array
     const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
       ...historyMessages,
       { role: 'user', content: message },
     ];
 
-    const { text: assistantMessage, tokensUsed } = await callClaude(
+    const task: AITask = useAdvancedModel ? 'chat-advanced' : 'chat';
+    const { text: assistantMessage, tokensUsed, model } = await callAI(
+      task,
       SYSTEM_PROMPT + contextSuffix,
       messages,
       1024,
-      useAdvancedModel,
     );
 
     if (!assistantMessage) {
@@ -432,10 +680,10 @@ export async function sendMessageToAria(
     }
 
     // Save to DB (non-blocking)
-    saveToHistory(user.id, message, assistantMessage, modelLabel, tokensUsed);
+    saveToHistory(user.id, message, assistantMessage, model, tokensUsed);
 
     return {
-      data: { message: assistantMessage, model: modelLabel, tokensUsed },
+      data: { message: assistantMessage, model, tokensUsed },
       error: null,
     };
   } catch (err) {
@@ -491,7 +739,7 @@ export async function clearChatHistory(): Promise<{ error: Error | null }> {
 
 /* ══════════════════════════════════════════════════════
    Relance IA — Générer un message multi-canal
-   Edge Function avec fallback client-side Claude direct
+   Utilise Gemini Flash (tâche légère) avec fallback
    ══════════════════════════════════════════════════════ */
 export async function generateSmartRelance(visitId: string): Promise<{
   data: { messages: RelanceMessages; visit: { lead_name: string; lead_phone: string; lead_email: string } } | null;
@@ -505,7 +753,7 @@ export async function generateSmartRelance(visitId: string): Promise<{
     // Edge function not deployed — fallback to client-side
   }
 
-  // Fallback: call Claude directly from client
+  // Fallback: call AI directly from client
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: null, error: new Error('Non authentifié') };
@@ -531,7 +779,8 @@ export async function generateSmartRelance(visitId: string): Promise<{
 - Agent : ${agentName}
 - Dernière relance : ${visit.relance_sent_at ? new Date(visit.relance_sent_at).toLocaleDateString('fr-FR') : 'Jamais'}`;
 
-    const { text: rawText } = await callClaude(
+    const { text: rawText } = await callAI(
+      'relance',
       RELANCE_PROMPT,
       [{ role: 'user', content: visitContext }],
       512,
@@ -544,7 +793,7 @@ export async function generateSmartRelance(visitId: string): Promise<{
       sms: `${visit.lead_name}, confirmez-vous notre RDV ? ${agentName} - Guin-e Immobilier`,
     };
 
-    const messages = parseClaudeJSON<RelanceMessages>(rawText, fallbackMessages);
+    const messages = parseAIJSON<RelanceMessages>(rawText, fallbackMessages);
 
     // Mark relance as sent
     await supabase
@@ -570,8 +819,8 @@ export async function generateSmartRelance(visitId: string): Promise<{
 }
 
 /* ══════════════════════════════════════════════════════
-   Analyse — Analyser une conversation (client-side)
-   Edge Function avec fallback Claude direct
+   Analyse — Analyser une conversation
+   Utilise Claude Sonnet + Extended Thinking (tâche avancée)
    ══════════════════════════════════════════════════════ */
 export async function analyzeConversation(conversationId: string): Promise<{
   data: { analysis: ConversationAnalysis; prospectName: string; tokensUsed: number } | null;
@@ -585,7 +834,7 @@ export async function analyzeConversation(conversationId: string): Promise<{
     // Edge function not deployed — fallback
   }
 
-  // Fallback: call Claude directly with extended thinking for deep analysis
+  // Fallback: call AI directly with Claude for deep analysis
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { data: null, error: new Error('Non authentifié') };
@@ -619,11 +868,11 @@ export async function analyzeConversation(conversationId: string): Promise<{
       return `[${new Date(m.created_at).toLocaleString('fr-FR')}] ${role}: ${m.content}`;
     }).join('\n');
 
-    const { text: rawText, tokensUsed } = await callClaude(
+    const { text: rawText, tokensUsed } = await callAI(
+      'analysis',
       CONVERSATION_SCAN_PROMPT,
       [{ role: 'user', content: `Analyse cette conversation :\n\n${conversationText}` }],
       1024,
-      true, // Use extended thinking for deep analysis
     );
 
     const fallbackAnalysis: ConversationAnalysis = {
@@ -636,7 +885,7 @@ export async function analyzeConversation(conversationId: string): Promise<{
       summary: 'Analyse non disponible.',
     };
 
-    const analysis = parseClaudeJSON<ConversationAnalysis>(rawText, fallbackAnalysis);
+    const analysis = parseAIJSON<ConversationAnalysis>(rawText, fallbackAnalysis);
 
     return { data: { analysis, prospectName, tokensUsed }, error: null };
   } catch (err) {
@@ -647,7 +896,7 @@ export async function analyzeConversation(conversationId: string): Promise<{
 
 /* ══════════════════════════════════════════════════════
    Rapport — Générer le rapport quotidien (enrichi)
-   Utilise extended thinking pour une analyse approfondie
+   Utilise Claude Sonnet + Extended Thinking (analyse approfondie)
    ══════════════════════════════════════════════════════ */
 export async function generateDailyReport(): Promise<{
   data: { report: string; tokensUsed: number; stats: Record<string, number> } | null;
@@ -714,15 +963,15 @@ STATS SEMAINE: ${weekTotal} visites, ${weekCompleted} terminées, ${weekSignatur
 PROSPECTS CHAUDS: ${hotProspects.length > 0 ? hotProspects.map(v => `🔥 ${v.lead_name} (${v.type})`).join(', ') : 'Aucun'}
 EN ATTENTE: ${todayVisits.filter(v => v.status === 'pending').length} visite(s) à confirmer`;
 
-    const { text: report, tokensUsed } = await callClaude(
+    const { text: report, tokensUsed, model } = await callAI(
+      'report',
       REPORT_PROMPT,
       [{ role: 'user', content: reportContext }],
       1500,
-      true, // Extended thinking for strategic report
     );
 
     // Save to history
-    saveToHistory(user.id, '[RAPPORT QUOTIDIEN]', report, 'claude-sonnet-thinking', tokensUsed);
+    saveToHistory(user.id, '[RAPPORT QUOTIDIEN]', report, model, tokensUsed);
 
     return {
       data: {
@@ -741,6 +990,7 @@ EN ATTENTE: ${todayVisits.filter(v => v.status === 'pending').length} visite(s) 
 /* ══════════════════════════════════════════════════════
    Scan IA — Analyser les conversations et auto-créer/
    mettre à jour les visites dans l'agenda
+   Utilise Claude Sonnet (analyse stratégique)
    ══════════════════════════════════════════════════════ */
 export async function scanConversationsForVisits(): Promise<{
   data: ScanResult[];
