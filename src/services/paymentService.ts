@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { handlePostPaymentSuccess } from './postPaymentService';
 
 export interface WalletData {
   id: string;
@@ -144,6 +145,13 @@ export async function simulateRentPayment(params: {
 
   if (fetchErr) return { data: null, error: fetchErr };
 
+  // Fire post-payment actions (notifications + emails) — non-blocking
+  if (isSuccess && updated) {
+    handlePostPaymentSuccess(updated.id).catch((err) =>
+      console.error('[Payment] Post-payment hook error:', err)
+    );
+  }
+
   return {
     data: updated ? { ...updated, amount: Number(updated.amount) } as TransactionData : null,
     error: null,
@@ -285,6 +293,11 @@ export async function processRentPayment(params: {
   if (txError || !transaction) {
     return { data: null, error: txError || new Error('Erreur création transaction') };
   }
+
+  // Fire post-payment actions (notifications + emails) — non-blocking
+  handlePostPaymentSuccess(transaction.id).catch((err) =>
+    console.error('[Payment] Post-payment hook error:', err)
+  );
 
   return {
     data: {
