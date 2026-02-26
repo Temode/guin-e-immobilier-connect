@@ -141,31 +141,36 @@ export default function AgentIAChat() {
     };
     setMessages((prev) => [...prev, tempUserMsg]);
 
-    const { data, error: apiError } = await generateDailyReport();
+    try {
+      const { data, error: apiError } = await generateDailyReport();
 
-    setIsTyping(false);
-    setIsLoading(false);
+      if (apiError || !data) {
+        setError(apiError?.message || 'Erreur lors de la génération du rapport.');
+        return;
+      }
 
-    if (apiError || !data) {
-      setError(apiError?.message || 'Erreur lors de la génération du rapport.');
-      return;
+      const assistantMsg: ChatMessage = {
+        id: `ai-report-${Date.now()}`,
+        role: 'assistant',
+        content: data.report,
+        created_at: new Date().toISOString(),
+        metadata: { model: 'claude-sonnet-thinking', tokens_used: data.tokensUsed, type: 'daily_report' },
+      };
+
+      setMessages((prev) => {
+        const withoutTemp = prev.filter((m) => m.id !== tempUserMsg.id);
+        const realUserMsg: ChatMessage = { ...tempUserMsg, id: `u-report-${Date.now()}` };
+        return [...withoutTemp, realUserMsg, assistantMsg];
+      });
+
+      refreshUsage();
+    } catch (err) {
+      console.error('[ARIA] handleDailyReport error:', err);
+      setError(err instanceof Error ? err.message : 'Erreur inattendue lors de la génération du rapport.');
+    } finally {
+      setIsTyping(false);
+      setIsLoading(false);
     }
-
-    const assistantMsg: ChatMessage = {
-      id: `ai-report-${Date.now()}`,
-      role: 'assistant',
-      content: data.report,
-      created_at: new Date().toISOString(),
-      metadata: { model: 'claude-sonnet-thinking', tokens_used: data.tokensUsed, type: 'daily_report' },
-    };
-
-    setMessages((prev) => {
-      const withoutTemp = prev.filter((m) => m.id !== tempUserMsg.id);
-      const realUserMsg: ChatMessage = { ...tempUserMsg, id: `u-report-${Date.now()}` };
-      return [...withoutTemp, realUserMsg, assistantMsg];
-    });
-
-    refreshUsage();
   }, [isLoading, refreshUsage]);
 
   const handleSend = useCallback(async (overrideText?: string) => {
@@ -193,36 +198,51 @@ export default function AgentIAChat() {
     setIsTyping(true);
     setIsLoading(true);
 
-    const { data, error: apiError } = await sendMessageToAria(text, useAdvanced);
+    try {
+      // Auto-detect write requests → force advanced mode for reliable action execution
+      const writeKeywords = /\b(ajouter|ajout|créer|crée|cr[ée]{2}|planifier|planifie|modifier|modifie|déplacer|déplace|supprimer|supprime|annuler|annule|mettre.*agenda|placer.*agenda|dans.*l.agenda|dans.*agenda|nouveau.*client|ajouter.*client)\b/i;
+      const forceAdvanced = useAdvanced || writeKeywords.test(text);
 
-    setIsTyping(false);
-    setIsLoading(false);
+      const { data, error: apiError } = await sendMessageToAria(text, forceAdvanced);
 
-    if (apiError || !data) {
-      setError(apiError?.message || 'Erreur lors de la communication avec ARIA.');
-      return;
-    }
+      if (apiError || !data) {
+        setError(apiError?.message || 'Erreur lors de la communication avec ARIA.');
+        return;
+      }
 
-    // Add assistant response
-    const assistantMsg: ChatMessage = {
-      id: `ai-${Date.now()}`,
-      role: 'assistant',
-      content: data.message,
-      created_at: new Date().toISOString(),
-      metadata: { model: data.model, tokens_used: data.tokensUsed },
-    };
+      // Build response with action results if any
+      let responseContent = data.message;
+      if (data.actionsExecuted?.length) {
+        responseContent += '\n\n---\n📌 **Actions exécutées :**\n' + data.actionsExecuted.join('\n');
+      }
 
-    // Replace temp user message + add assistant (history already saved server-side)
-    setMessages((prev) => {
-      const withoutTemp = prev.filter((m) => m.id !== tempUserMsg.id);
-      const realUserMsg: ChatMessage = {
-        ...tempUserMsg,
-        id: `u-${Date.now()}`,
+      // Add assistant response
+      const assistantMsg: ChatMessage = {
+        id: `ai-${Date.now()}`,
+        role: 'assistant',
+        content: responseContent,
+        created_at: new Date().toISOString(),
+        metadata: { model: data.model, tokens_used: data.tokensUsed },
       };
-      return [...withoutTemp, realUserMsg, assistantMsg];
-    });
 
-    refreshUsage();
+      // Replace temp user message + add assistant (history already saved server-side)
+      setMessages((prev) => {
+        const withoutTemp = prev.filter((m) => m.id !== tempUserMsg.id);
+        const realUserMsg: ChatMessage = {
+          ...tempUserMsg,
+          id: `u-${Date.now()}`,
+        };
+        return [...withoutTemp, realUserMsg, assistantMsg];
+      });
+
+      refreshUsage();
+    } catch (err) {
+      console.error('[ARIA] handleSend error:', err);
+      setError(err instanceof Error ? err.message : 'Erreur inattendue lors de la communication avec ARIA.');
+    } finally {
+      setIsTyping(false);
+      setIsLoading(false);
+    }
   }, [input, isLoading, useAdvanced, handleDailyReport, refreshUsage]);
 
   const handleQuickPrompt = (text: string) => {

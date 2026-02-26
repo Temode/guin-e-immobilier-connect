@@ -459,6 +459,14 @@ async function saveToHistory(userId: string, userMsg: string, assistantMsg: stri
    lecture pour que l'IA puisse répondre sur
    les prospects, biens, conversations, etc.
    ────────────────────────────────────────── */
+async function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function buildAgentContext(userId: string, agentName: string): Promise<string> {
   const now = new Date();
   const todayStr = now.toISOString().split('T')[0];
@@ -742,8 +750,8 @@ export async function sendMessageToAria(
       // Tables not ready — continue without history
     }
 
-    // Build rich context
-    const contextSuffix = await buildAgentContext(user.id, agentName);
+    // Build rich context (timeout 8s to avoid hanging)
+    const contextSuffix = await withTimeout(buildAgentContext(user.id, agentName), 8000, `\n\n[CONTEXTE: ${new Date().toLocaleString('fr-FR')} — Agent: ${agentName}]\n[Chargement contexte incomplet — données partielles]`);
 
     // Build messages array
     const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
@@ -751,7 +759,9 @@ export async function sendMessageToAria(
       { role: 'user', content: message },
     ];
 
-    const task: AITask = useAdvancedModel ? 'chat-advanced' : 'chat';
+    // Auto-escalate to advanced for write requests (agenda, clients, visits)
+    const writeIntent = /\b(ajouter|ajout|créer|crée|planifier|planifie|modifier|modifie|déplacer|supprimer|annuler|mettre.*agenda|placer.*agenda|dans.*l.agenda|nouveau.*client)\b/i.test(message);
+    const task: AITask = (useAdvancedModel || writeIntent) ? 'chat-advanced' : 'chat';
     const { text: rawResponse, tokensUsed, model } = await callAI(
       task,
       SYSTEM_PROMPT + contextSuffix,
