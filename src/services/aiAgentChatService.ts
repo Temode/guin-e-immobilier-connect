@@ -138,7 +138,7 @@ FORMAT DE TES RÉPONSES
 - Si l'agent demande une relance → propose les 3 canaux (WhatsApp, Email, SMS)
 - Si l'agent parle d'un prospect → donne ton évaluation du score
 - Si c'est le matin → propose de générer le rapport quotidien
-- Maximum 300 mots par réponse sauf pour les rapports
+- Maximum 500 mots par réponse sauf pour les rapports (ne jamais couper une réponse en cours)
 
 Réponds toujours en français sauf si l'agent écrit dans une autre langue.`;
 
@@ -762,11 +762,13 @@ export async function sendMessageToAria(
     // Auto-escalate to advanced for write requests (agenda, clients, visits)
     const writeIntent = /\b(ajouter|ajout|créer|crée|planifier|planifie|modifier|modifie|déplacer|supprimer|annuler|mettre.*agenda|placer.*agenda|dans.*l.agenda|nouveau.*client)\b/i.test(message);
     const task: AITask = (useAdvancedModel || writeIntent) ? 'chat-advanced' : 'chat';
+    // 2048 tokens for regular chat (~1500 words), 4096 for advanced (actions + long analysis)
+    const maxTokens = task === 'chat-advanced' ? 4096 : 2048;
     const { text: rawResponse, tokensUsed, model } = await callAI(
       task,
       SYSTEM_PROMPT + contextSuffix,
       messages,
-      1024,
+      maxTokens,
     );
 
     if (!rawResponse) {
