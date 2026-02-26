@@ -26,6 +26,15 @@ import AgentCommissions from './components/dashbord_demarcheur/Agentcommissions'
 import AgentSettings from './components/dashbord_demarcheur/Agentsettings';
 import AgentIAChat from './components/dashbord_demarcheur/AgentIAChat';
 import PropertyDetail from './pages/PropertyDetail';
+import AdminLayout from './components/backoffice/shared/AdminLayout';
+import AdminDashboard from './components/backoffice/AdminDashboard';
+import AdminUsers from './components/backoffice/AdminUsers';
+import AdminProperties from './components/backoffice/AdminProperties';
+import AdminRentals from './components/backoffice/AdminRentals';
+import AdminFinances from './components/backoffice/AdminFinances';
+import AdminActivity from './components/backoffice/AdminActivity';
+import AdminIA from './components/backoffice/AdminIA';
+import AdminSettings from './components/backoffice/AdminSettings';
 
 export default function App() {
   return (
@@ -68,6 +77,21 @@ export default function App() {
               <Route path="notifications" element={<Notifications />} />
               <Route path="recherche" element={<SearchProperty />} />
               <Route path="profil" element={<ProfileSettings />} />
+            </Route>
+
+            <Route path="/backoffice" element={
+              <ProtectedRoute>
+                <AdminLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<AdminDashboard />} />
+              <Route path="utilisateurs" element={<AdminUsers />} />
+              <Route path="biens" element={<AdminProperties />} />
+              <Route path="locations" element={<AdminRentals />} />
+              <Route path="finances" element={<AdminFinances />} />
+              <Route path="activite" element={<AdminActivity />} />
+              <Route path="ia" element={<AdminIA />} />
+              <Route path="parametres" element={<AdminSettings />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" />} />
