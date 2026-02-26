@@ -436,6 +436,9 @@ async function saveToHistory(userId: string, userMsg: string, assistantMsg: stri
 
 /* ──────────────────────────────────────────
    Helper: build rich context for ARIA
+   Injecte TOUTES les données plateforme en
+   lecture pour que l'IA puisse répondre sur
+   les prospects, biens, conversations, etc.
    ────────────────────────────────────────── */
 async function buildAgentContext(userId: string, agentName: string): Promise<string> {
   const now = new Date();
@@ -444,11 +447,11 @@ async function buildAgentContext(userId: string, agentName: string): Promise<str
 
   parts.push(`[CONTEXTE: ${now.toLocaleString('fr-FR', { timeZone: 'Africa/Conakry' })} — Agent: ${agentName}]`);
 
-  // Fetch today's visits
+  // ── 1. AGENDA : Visites du jour ──
   try {
     const { data: visits } = await supabase
       .from('visits')
-      .select('lead_name, type, status, scheduled_at, ai_prospect_score')
+      .select('lead_name, lead_phone, lead_notes, type, status, scheduled_at, address, ai_prospect_score, property:property_id(title, city)')
       .gte('scheduled_at', `${todayStr}T00:00:00`)
       .lte('scheduled_at', `${todayStr}T23:59:59`)
       .neq('status', 'cancelled')
@@ -456,7 +459,7 @@ async function buildAgentContext(userId: string, agentName: string): Promise<str
 
     if (visits?.length) {
       parts.push(`[AGENDA DU JOUR: ${visits.map(v =>
-        `${new Date(v.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} ${v.lead_name} (${v.type}, ${v.status}${v.ai_prospect_score !== 'unknown' ? `, ${v.ai_prospect_score}` : ''})`
+        `${new Date(v.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} ${v.lead_name} (${v.type}, ${v.status}${v.ai_prospect_score !== 'unknown' ? `, score:${v.ai_prospect_score}` : ''}) — ${v.property?.title || v.address || 'Lieu non précisé'}${v.lead_notes ? ` — Notes: ${v.lead_notes}` : ''}`
       ).join(' | ')}]`);
     } else {
       parts.push('[AGENDA DU JOUR: Aucune visite prévue]');
@@ -465,7 +468,134 @@ async function buildAgentContext(userId: string, agentName: string): Promise<str
     // Tables not ready
   }
 
-  // Fetch pending visits count
+  // ── 2. TOUS LES PROSPECTS : Visites à venir (prochains 30 jours) ──
+  try {
+    const in30days = new Date(now);
+    in30days.setDate(in30days.getDate() + 30);
+
+    const { data: allVisits } = await supabase
+      .from('visits')
+      .select('lead_name, lead_phone, lead_email, lead_notes, type, status, scheduled_at, address, ai_prospect_score, follow_up_required, relance_sent_at, property:property_id(title, city, type, price)')
+      .gte('scheduled_at', now.toISOString())
+      .lte('scheduled_at', in30days.toISOString())
+      .neq('status', 'cancelled')
+      .order('scheduled_at');
+
+    if (allVisits?.length) {
+      const hot = allVisits.filter(v => v.ai_prospect_score === 'hot');
+      const warm = allVisits.filter(v => v.ai_prospect_score === 'warm');
+      const cold = allVisits.filter(v => v.ai_prospect_score === 'cold');
+      const pending = allVisits.filter(v => v.status === 'pending');
+      const needsRelance = allVisits.filter(v => v.follow_up_required && !v.relance_sent_at);
+
+      parts.push(`[PROSPECTS — ${allVisits.length} visite(s) à venir :`);
+      if (hot.length) parts.push(`  🔥 CHAUDS (${hot.length}): ${hot.map(v => `${v.lead_name} (${v.type}, ${new Date(v.scheduled_at).toLocaleDateString('fr-FR')})${v.lead_phone ? ` tel:${v.lead_phone}` : ''}${v.lead_notes ? ` — ${v.lead_notes}` : ''}${v.property ? ` — Bien: ${v.property.title} ${v.property.city} ${v.property.price?.toLocaleString('fr-FR')} GNF` : ''}`).join(' | ')}`);
+      if (warm.length) parts.push(`  🟡 TIÈDES (${warm.length}): ${warm.map(v => `${v.lead_name} (${v.type}, ${new Date(v.scheduled_at).toLocaleDateString('fr-FR')})${v.lead_notes ? ` — ${v.lead_notes}` : ''}${v.property ? ` — Bien: ${v.property.title} ${v.property.city}` : ''}`).join(' | ')}`);
+      if (cold.length) parts.push(`  ❄️ FROIDS (${cold.length}): ${cold.map(v => `${v.lead_name} (${v.type})`).join(', ')}`);
+      if (pending.length) parts.push(`  ⏳ EN ATTENTE CONFIRMATION (${pending.length}): ${pending.map(v => v.lead_name).join(', ')}`);
+      if (needsRelance.length) parts.push(`  📩 À RELANCER (${needsRelance.length}): ${needsRelance.map(v => v.lead_name).join(', ')}`);
+      parts.push(']');
+    }
+  } catch {
+    // Tables not ready
+  }
+
+  // ── 3. CONVERSATIONS RÉCENTES avec prospects/locataires ──
+  try {
+    // Get conversations where this agent participates
+    const { data: participations } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('user_id', userId);
+
+    if (participations?.length) {
+      const convIds = participations.map(p => p.conversation_id);
+
+      // For each conversation, get recent messages + other participant name
+      const conversationSummaries: string[] = [];
+      for (const convId of convIds.slice(0, 8)) { // Limit to 8 conversations
+        // Get the other participant
+        const { data: otherParticipants } = await supabase
+          .from('conversation_participants')
+          .select('user_id')
+          .eq('conversation_id', convId)
+          .neq('user_id', userId);
+
+        let otherName = 'Inconnu';
+        if (otherParticipants?.[0]?.user_id) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', otherParticipants[0].user_id)
+            .single();
+          otherName = profile?.full_name || 'Inconnu';
+        }
+
+        // Get last 6 messages of this conversation
+        const { data: msgs } = await supabase
+          .from('messages')
+          .select('sender_id, content, created_at')
+          .eq('conversation_id', convId)
+          .order('created_at', { ascending: false })
+          .limit(6);
+
+        if (msgs?.length) {
+          const formatted = msgs.reverse().map(m => {
+            const who = m.sender_id === userId ? 'Agent' : otherName;
+            return `[${new Date(m.created_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}] ${who}: ${m.content.slice(0, 200)}`;
+          }).join('\n    ');
+
+          conversationSummaries.push(`  💬 ${otherName}:\n    ${formatted}`);
+        }
+      }
+
+      if (conversationSummaries.length) {
+        parts.push(`[CONVERSATIONS RÉCENTES (${conversationSummaries.length}):\n${conversationSummaries.join('\n')}\n]`);
+      }
+    }
+  } catch {
+    // Tables not ready
+  }
+
+  // ── 4. BIENS IMMOBILIERS de l'agent ──
+  try {
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('id, title, type, transaction_type, price, currency, city, commune, quartier, bedrooms, bathrooms, area, furnished, status, amenities')
+      .eq('owner_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (properties?.length) {
+      parts.push(`[BIENS DE L'AGENT (${properties.length}):\n${properties.map(p =>
+        `  🏠 ${p.title} — ${p.type} ${p.transaction_type === 'rent' ? 'Location' : 'Vente'} — ${p.price?.toLocaleString('fr-FR')} ${p.currency || 'GNF'} — ${p.city}${p.commune ? `/${p.commune}` : ''}${p.quartier ? `/${p.quartier}` : ''} — ${p.bedrooms || '?'}ch/${p.bathrooms || '?'}sdb${p.area ? `/${p.area}m²` : ''} — ${p.furnished ? 'Meublé' : 'Non meublé'} — Statut: ${p.status}${(p.amenities as string[])?.length ? ` — Commodités: ${(p.amenities as string[]).join(', ')}` : ''}`
+      ).join('\n')}\n]`);
+    } else {
+      parts.push('[BIENS DE L\'AGENT: Aucun bien enregistré]');
+    }
+  } catch {
+    // Tables not ready
+  }
+
+  // ── 5. LOCATIONS ACTIVES ──
+  try {
+    const { data: rentals } = await supabase
+      .from('rentals')
+      .select('rent_amount, currency, start_date, end_date, status, payment_method, property:property_id(title, city), tenant:tenant_id(full_name)')
+      .or(`owner_id.eq.${userId},agent_id.eq.${userId}`)
+      .eq('status', 'active')
+      .limit(10);
+
+    if (rentals?.length) {
+      parts.push(`[LOCATIONS ACTIVES (${rentals.length}):\n${rentals.map(r =>
+        `  🔑 ${(r.property as any)?.title || 'Bien'} — Locataire: ${(r.tenant as any)?.full_name || '?'} — ${r.rent_amount?.toLocaleString('fr-FR')} ${r.currency || 'GNF'}/mois — Depuis: ${r.start_date} — Paiement: ${r.payment_method || 'non défini'}`
+      ).join('\n')}\n]`);
+    }
+  } catch {
+    // Tables not ready
+  }
+
+  // ── 6. ALERTES ──
   try {
     const { data: pending } = await supabase
       .from('visits')
@@ -473,8 +603,18 @@ async function buildAgentContext(userId: string, agentName: string): Promise<str
       .eq('status', 'pending')
       .gte('scheduled_at', now.toISOString());
 
-    if (pending?.length) {
-      parts.push(`[ALERTES: ${pending.length} visite(s) en attente de confirmation]`);
+    const { data: unread } = await supabase
+      .from('notifications')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('read', false);
+
+    const alerts: string[] = [];
+    if (pending?.length) alerts.push(`${pending.length} visite(s) en attente de confirmation`);
+    if (unread?.length) alerts.push(`${unread.length} notification(s) non lue(s)`);
+
+    if (alerts.length) {
+      parts.push(`[ALERTES: ${alerts.join(' | ')}]`);
     }
   } catch {
     // Tables not ready
