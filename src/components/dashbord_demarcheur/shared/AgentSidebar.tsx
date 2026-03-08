@@ -8,6 +8,7 @@ import {
   CalendarIcon,
   CurrencyIcon,
   MessageIcon,
+  NotificationIcon,
   SettingsIcon,
   StarIcon,
   SparklesIcon,
@@ -16,6 +17,7 @@ import {
 import styles from './DashboardAgentLayout.module.css';
 import { useAuthContext } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { getUnreadCount } from '@/services/notificationService';
 
 interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
@@ -46,6 +48,7 @@ const navSections: NavSection[] = [
     title: 'Communication',
     items: [
       { icon: MessageIcon, label: 'Messages', to: '/dashbord-agent/messages', badge: 0, badgeUrgent: true },
+      { icon: NotificationIcon, label: 'Notifications', to: '/dashbord-agent/notifications', dynamicBadgeKey: 'notifications', badgeUrgent: true },
       { icon: BotIcon, label: 'IA Assistant · ARIA', to: '/dashbord-agent/ia-chat' },
     ],
   },
@@ -66,6 +69,7 @@ const navSections: NavSection[] = [
 const AgentSidebar = () => {
   const { user, profile } = useAuthContext();
   const [propertyCount, setPropertyCount] = useState<number>(0);
+  const [notifCount, setNotifCount] = useState<number>(0);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [dbProfile, setDbProfile] = useState<any>(null);
 
@@ -95,6 +99,10 @@ const AgentSidebar = () => {
         .eq('owner_id', user.id);
 
       setPropertyCount(count || 0);
+
+      // Fetch unread notification count
+      const unread = await getUnreadCount(user.id);
+      setNotifCount(unread);
     };
 
     fetchData();
@@ -144,6 +152,7 @@ const AgentSidebar = () => {
 
   const getBadge = (item: NavItem): number | string | undefined => {
     if (item.dynamicBadgeKey === 'properties') return propertyCount;
+    if (item.dynamicBadgeKey === 'notifications') return notifCount;
     return item.badge;
   };
 

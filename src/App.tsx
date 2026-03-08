@@ -25,6 +25,7 @@ import AgentMessages from './components/dashbord_demarcheur/Agentmessages';
 import AgentCommissions from './components/dashbord_demarcheur/Agentcommissions';
 import AgentSettings from './components/dashbord_demarcheur/Agentsettings';
 import AgentIAChat from './components/dashbord_demarcheur/AgentIAChat';
+import AgentNotifications from './components/dashbord_demarcheur/AgentNotifications';
 import PropertyDetail from './pages/PropertyDetail';
 import AdminLayout from './components/backoffice/shared/AdminLayout';
 import AdminDashboard from './components/backoffice/AdminDashboard';
@@ -60,6 +61,7 @@ export default function App() {
               <Route path="agenda" element={<AgentAgenda />} />
               <Route path="messages" element={<AgentMessages />} />
               <Route path="commissions" element={<AgentCommissions />} />
+              <Route path="notifications" element={<AgentNotifications />} />
               <Route path="ia-chat" element={<AgentIAChat />} />
               <Route path="profil" element={<AgentSettings />} />
             </Route>
