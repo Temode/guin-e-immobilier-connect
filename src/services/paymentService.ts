@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { handlePostPaymentSuccess } from './postPaymentService';
+import { COMMISSION_SYSTEM_ENABLED } from '@/config/paymentConfig';
 
 export interface WalletData {
   id: string;
@@ -225,31 +226,36 @@ export async function processRentPayment(params: {
   data: { success: boolean; transactionId: string | null; ownerAmount: number; agentAmount: number; status: string } | null;
   error: Error | null;
 }> {
-  // Try the SECURITY DEFINER RPC first (requires migration 20260220120000 to be applied)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: rpcResult, error: rpcError } = await (supabase as any).rpc('process_rent_payment', {
-    p_rental_id: params.rentalId,
-    p_payment_method: params.paymentMethod || 'orange_money',
-    p_phone_number: params.phoneNumber || null,
-  });
+  // ─── Commission split mode (DISABLED for MVP) ───
+  // When COMMISSION_SYSTEM_ENABLED is true, uses the process_rent_payment RPC
+  // which splits rent between agent and owner (e.g. 10%/90%).
+  // When false (MVP), 100% goes to the agent's wallet.
+  if (COMMISSION_SYSTEM_ENABLED) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: rpcResult, error: rpcError } = await (supabase as any).rpc('process_rent_payment', {
+      p_rental_id: params.rentalId,
+      p_payment_method: params.paymentMethod || 'orange_money',
+      p_phone_number: params.phoneNumber || null,
+    });
 
-  // If RPC exists and worked, return result
-  if (!rpcError) {
-    const result = rpcResult as any;
-    return {
-      data: {
-        success: result?.success ?? false,
-        transactionId: result?.transaction_id ?? null,
-        ownerAmount: Number(result?.owner_amount ?? 0),
-        agentAmount: Number(result?.agent_amount ?? 0),
-        status: result?.status ?? 'failed',
-      },
-      error: result?.success ? null : new Error(result?.failure_reason || 'Paiement échoué'),
-    };
+    // If RPC exists and worked, return result
+    if (!rpcError) {
+      const result = rpcResult as any;
+      return {
+        data: {
+          success: result?.success ?? false,
+          transactionId: result?.transaction_id ?? null,
+          ownerAmount: Number(result?.owner_amount ?? 0),
+          agentAmount: Number(result?.agent_amount ?? 0),
+          status: result?.status ?? 'failed',
+        },
+        error: result?.success ? null : new Error(result?.failure_reason || 'Paiement échoué'),
+      };
+    }
   }
 
-  // Fallback: direct transaction insert (works without migration applied)
-  // The receiver wallet won't be credited in this mode, but the transaction is recorded.
+  // MVP mode: 100% of rent goes to agent's wallet
+  // Direct transaction insert + wallet credit via complete_sandbox_payment
   const { data: rental, error: rentalError } = await supabase
     .from('rentals')
     .select('*')
@@ -267,23 +273,26 @@ export async function processRentPayment(params: {
   // Simulate processing delay
   await new Promise(resolve => setTimeout(resolve, 1500));
 
-  // Create completed transaction directly (no RPC needed)
+  // Create pending transaction, then use complete_sandbox_payment to atomically
+  // mark as completed + credit agent wallet (bypasses RLS)
+  const payerId = (await supabase.auth.getUser()).data.user?.id;
   const { data: transaction, error: txError } = await supabase
     .from('transactions')
     .insert({
       rental_id: params.rentalId,
-      payer_id: (await supabase.auth.getUser()).data.user?.id,
+      payer_id: payerId,
       receiver_id: agentId,
       amount: rentAmount,
       currency: rental.currency || 'GNF',
       payment_method: params.paymentMethod || 'orange_money',
       payment_reference: reference,
       type: 'rent_payment',
-      status: 'completed',
+      status: 'pending',
       description: `Loyer - ${new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`,
       metadata: {
         sandbox: true,
-        fallback_mode: true,
+        mvp_mode: true,
+        commission_system_enabled: false,
         phone_number: params.phoneNumber || null,
       },
     })
@@ -292,6 +301,33 @@ export async function processRentPayment(params: {
 
   if (txError || !transaction) {
     return { data: null, error: txError || new Error('Erreur création transaction') };
+  }
+
+  // Use complete_sandbox_payment RPC to atomically mark completed + credit agent wallet
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: rpcResult, error: rpcErr } = await (supabase as any)
+    .rpc('complete_sandbox_payment', {
+      p_transaction_id: transaction.id,
+      p_is_success: Math.random() > 0.1, // 90% success rate
+    });
+
+  if (rpcErr) {
+    return { data: null, error: rpcErr };
+  }
+
+  const isSuccess = (rpcResult as any)?.status === 'completed';
+
+  if (!isSuccess) {
+    return {
+      data: {
+        success: false,
+        transactionId: transaction.id,
+        ownerAmount: 0,
+        agentAmount: 0,
+        status: 'failed',
+      },
+      error: new Error('Paiement échoué (simulation)'),
+    };
   }
 
   // Fire post-payment actions (notifications + emails) — non-blocking
