@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuthContext } from '@/context/AuthContext';
 import { getAgentRentals } from '@/services/rentalService';
-import { getOrCreateWallet, getUserTransactions, getPaymentStats, formatAmount, getPaymentMethodInfo, getTransactionStatusInfo, simulateWithdrawal, type WalletData, type TransactionData } from '@/services/paymentService';
+import { getOrCreateWallet, getUserTransactions, getPaymentStats, formatAmount, getPaymentMethodInfo, getTransactionStatusInfo, type WalletData, type TransactionData } from '@/services/paymentService';
+import { createWithdrawalRequest } from '@/services/withdrawalService';
 import styles from './AgentCommissions.module.css';
 
 /* ==========================================
@@ -207,11 +208,10 @@ const WithdrawalModal = ({
     setProcessing(true);
     setResult(null);
 
-    const { data, error } = await simulateWithdrawal({
-      userId,
+    const { data, error } = await createWithdrawalRequest({
       amount: numAmount,
       currency,
-      withdrawMethod: method,
+      method,
       phoneNumber: method !== 'bank' ? phoneNumber : undefined,
       bankAccount: method === 'bank' ? bankAccount : undefined,
     });
@@ -221,15 +221,11 @@ const WithdrawalModal = ({
       setResult({ success: false, message: error.message });
     } else if (data) {
       setResult({
-        success: data.status === 'completed',
-        message: data.status === 'completed' 
-          ? `Retrait de ${formatAmount(numAmount)} ${currency} effectué avec succès !`
-          : 'Le retrait a échoué. Veuillez réessayer.',
+        success: true,
+        message: `Votre demande de retrait de ${formatAmount(numAmount)} ${currency} a été envoyée. Vous recevrez votre argent sous 24-48h. Vous serez notifié par email une fois le transfert effectué.`,
         reference: data.payment_reference || undefined,
       });
-      if (data.status === 'completed') {
-        setTimeout(() => { onSuccess(); onClose(); resetForm(); }, 2500);
-      }
+      setTimeout(() => { onSuccess(); onClose(); resetForm(); }, 4000);
     }
   };
 
@@ -262,9 +258,9 @@ const WithdrawalModal = ({
           <button className={styles.modalCloseBtn} onClick={handleClose} disabled={processing}><XIcon /></button>
         </div>
 
-        {/* Sandbox badge */}
+        {/* Info badge */}
         <div className={styles.sandboxBadge}>
-          <span>🧪</span> Mode Sandbox — Simulation de retrait
+          <span>ℹ️</span> Le retrait sera traité manuellement sous 24-48h
         </div>
 
         {/* Result */}
@@ -375,7 +371,7 @@ const WithdrawalModal = ({
               disabled={!canSubmit}
               onClick={handleSubmit}
             >
-              <WithdrawIcon /> Confirmer le retrait
+              <WithdrawIcon /> Lancer le retrait
             </button>
           </>
         )}

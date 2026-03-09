@@ -36,6 +36,7 @@ import AdminFinances from './components/backoffice/AdminFinances';
 import AdminActivity from './components/backoffice/AdminActivity';
 import AdminIA from './components/backoffice/AdminIA';
 import AdminSettings from './components/backoffice/AdminSettings';
+import AdminWithdrawals from './components/backoffice/AdminWithdrawals';
 
 export default function App() {
   return (
@@ -91,6 +92,7 @@ export default function App() {
               <Route path="biens" element={<AdminProperties />} />
               <Route path="locations" element={<AdminRentals />} />
               <Route path="finances" element={<AdminFinances />} />
+              <Route path="retraits" element={<AdminWithdrawals />} />
               <Route path="activite" element={<AdminActivity />} />
               <Route path="ia" element={<AdminIA />} />
               <Route path="parametres" element={<AdminSettings />} />
