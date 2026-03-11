@@ -128,7 +128,6 @@ serve(async (req) => {
         .eq('id', transaction.id);
 
       // Credit the agent's wallet atomically (receiver_id = agent)
-      // Uses INSERT ON CONFLICT to either create or add to existing balance
       const txAmount = Number(transaction.amount);
       await supabaseAdmin.rpc('credit_wallet_atomic', {
         p_user_id: transaction.receiver_id,
@@ -136,19 +135,67 @@ serve(async (req) => {
         p_currency: transaction.currency,
       });
 
-      // Send notification to the agent
-      await supabaseAdmin.from('notifications').insert({
-        user_id: transaction.receiver_id,
-        title: 'Paiement de loyer reçu',
-        message: `Un paiement de ${txAmount.toLocaleString('fr-FR')} ${transaction.currency} a été reçu pour le loyer.`,
-        type: 'payment_received',
-        metadata: {
-          transaction_id: transaction.id,
-          amount: txAmount,
-          currency: transaction.currency,
-          payer_id: transaction.payer_id,
-        },
-      });
+      // In-platform notifications are handled by the DB trigger
+      // (trg_notify_payment_completed fires on status → 'completed')
+      // Here we trigger the email Edge Function for all parties
+
+      // Load rental + profiles for email context
+      if (transaction.rental_id) {
+        try {
+          const { data: rental } = await supabaseAdmin
+            .from('rentals')
+            .select('tenant_id, owner_id, agent_id, property_id')
+            .eq('id', transaction.rental_id)
+            .single();
+
+          if (rental) {
+            const [propertyRes, tenantRes, agentRes, ownerRes] = await Promise.all([
+              supabaseAdmin.from('properties').select('title, address, city, quartier').eq('id', rental.property_id).single(),
+              supabaseAdmin.from('profiles').select('full_name').eq('id', rental.tenant_id).single(),
+              rental.agent_id
+                ? supabaseAdmin.from('profiles').select('full_name').eq('id', rental.agent_id).single()
+                : Promise.resolve({ data: null }),
+              supabaseAdmin.from('profiles').select('full_name').eq('id', rental.owner_id).single(),
+            ]);
+
+            const property = propertyRes.data;
+            const addressParts = [property?.quartier, property?.city].filter(Boolean);
+
+            // Call send-payment-email Edge Function (fire and forget)
+            const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+            const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+            fetch(`${supabaseUrl}/functions/v1/send-payment-email`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${serviceRoleKey}`,
+              },
+              body: JSON.stringify({
+                transactionId: transaction.id,
+                paymentReference: transaction.payment_reference,
+                amount: txAmount,
+                currency: transaction.currency,
+                paymentMethod: transaction.payment_method,
+                paymentDate: transaction.created_at,
+                tenantId: rental.tenant_id,
+                tenantName: tenantRes.data?.full_name || 'Locataire',
+                agentId: rental.agent_id,
+                agentName: agentRes.data?.full_name || null,
+                ownerId: rental.owner_id,
+                ownerName: ownerRes.data?.full_name || null,
+                propertyTitle: property?.title || 'Logement',
+                propertyAddress: property?.address || addressParts.join(', ') || '',
+                rentPeriod: new Date(transaction.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+              }),
+            }).catch((emailErr) => {
+              console.error('[Webhook] Email Edge Function call failed:', emailErr);
+            });
+          }
+        } catch (contextErr) {
+          console.error('[Webhook] Failed to load email context:', contextErr);
+        }
+      }
 
       // Mark webhook event as processed
       await supabaseAdmin
