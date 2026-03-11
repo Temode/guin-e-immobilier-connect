@@ -83,7 +83,7 @@ export default function App() {
             </Route>
 
             <Route path="/backoffice" element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredRole="admin">
                 <AdminLayout />
               </ProtectedRoute>
             }>

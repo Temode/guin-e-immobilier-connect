@@ -137,7 +137,7 @@ const BalanceHero = ({ balance, currency, onWithdraw }: { balance: number; curre
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
           <div className={styles.balancePlan}><BadgeCheckIcon />Plan Basic • 5% commission</div>
-          <button className={`${styles.btn} ${styles.btnWithdraw}`} onClick={onWithdraw} disabled={balance <= 0}>
+          <button className={`${styles.btn} ${styles.btnWithdraw}`} onClick={onWithdraw}>
             <ArrowUpIcon /> Retirer des fonds
           </button>
         </div>
