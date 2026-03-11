@@ -7,6 +7,7 @@
  * 3. Compter les notifications non lues
  */
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 
 /* ─── Types ─── */
 
@@ -17,7 +18,7 @@ export interface NotificationData {
   message: string;
   type: string;
   read: boolean;
-  metadata: Record<string, unknown> | null;
+  metadata: Json;
   created_at: string;
 }
 
@@ -26,7 +27,7 @@ export interface CreateNotificationParams {
   title: string;
   message: string;
   type: string;
-  metadata?: Record<string, unknown>;
+  metadata?: Json;
 }
 
 /* ─── Create a single notification ─── */

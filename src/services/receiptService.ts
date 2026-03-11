@@ -357,7 +357,8 @@ export async function downloadReceipt(transactionId: string): Promise<{ error: E
   if (error || !data) return { error: error || new Error('Données du reçu introuvables') };
 
   const pdfBytes = generateReceiptPdf(data);
-  const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+  const safePdfBytes = new Uint8Array(pdfBytes);
+  const blob = new Blob([safePdfBytes], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
 
   const a = document.createElement('a');
