@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuthContext } from '@/context/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import type { Enums } from '@/integrations/supabase/types';
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: string }> = ({ children, requiredRole }) => {
+type AppRole = Enums<'app_role'>;
+
+const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: AppRole }> = ({ children, requiredRole }) => {
   const { user, loading } = useAuthContext();
   const [roleChecked, setRoleChecked] = useState(!requiredRole);
   const [hasRole, setHasRole] = useState(false);

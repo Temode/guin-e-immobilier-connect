@@ -406,7 +406,7 @@ serve(async (req) => {
         html,
         attachments: [pdfAttachment],
       });
-      results.push({ to: tenantEmail, role: 'tenant', ...result });
+      results.push({ to: tenantEmail, role: 'tenant', sent: result.success, error: result.error });
     }
 
     // 2. Email to agent
@@ -430,7 +430,7 @@ serve(async (req) => {
           html,
           attachments: [pdfAttachment],
         });
-        results.push({ to: agentEmail, role: 'agent', ...result });
+        results.push({ to: agentEmail, role: 'agent', sent: result.success, error: result.error });
       }
     }
 
@@ -455,7 +455,7 @@ serve(async (req) => {
           html,
           attachments: [pdfAttachment],
         });
-        results.push({ to: ownerEmail, role: 'owner', ...result });
+        results.push({ to: ownerEmail, role: 'owner', sent: result.success, error: result.error });
       }
     }
 
