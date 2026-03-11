@@ -1256,40 +1256,9 @@
 }
 
 /* ==========================================
-   MODAL
+   MODAL (legacy — kept for reference, overridden by withdrawal modal below)
 ========================================== */
-.modalOverlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  opacity: 0;
-  visibility: hidden;
-  transition: var(--transition-base);
-}
-
-.modalOverlay.active {
-  opacity: 1;
-  visibility: visible;
-}
-
-.modal {
-  background: white;
-  border-radius: var(--radius-2xl);
-  width: 100%;
-  max-width: 500px;
-  max-height: 90vh;
-  overflow: hidden;
-  transform: translateY(20px);
-  transition: var(--transition-base);
-}
-
-.modalOverlay.active .modal {
-  transform: translateY(0);
-}
+/* .modalOverlay legacy rules removed to avoid conflict with withdrawal modal */
 
 .modalHeader {
   padding: 24px;
