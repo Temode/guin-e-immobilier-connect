@@ -15,10 +15,10 @@ import { createNotification } from './notificationService';
 /* ─── Config ─── */
 
 /** Email du fondateur qui recevra les notifications de retrait */
-export const FOUNDER_EMAIL = 'admin@guin-e-immobilier.com';
+export const FOUNDER_EMAIL = 'terriumplus1@gmail.com';
 
 /** Numéro du fondateur pour les SMS (format international) */
-export const FOUNDER_PHONE = '+224620000000';
+export const FOUNDER_PHONE = '+224611599395';
 
 /* ─── Types ─── */
 
