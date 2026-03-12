@@ -50,6 +50,8 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/auth" element={<SocialAuthPage />} />
             <Route path="/auth/email" element={<EmailAuthPage />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/user-role" element={<UserRoleSelection />} />
             <Route path="/property/:id" element={<PropertyDetail />} />
             
