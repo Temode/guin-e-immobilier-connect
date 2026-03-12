@@ -182,7 +182,7 @@ const EmailAuthPage: React.FC = () => {
             </div>
 
             <div className={styles.forgotPassword}>
-              <a href="#">Mot de passe oublié ?</a>
+              <Link to="/forgot-password">Mot de passe oublié ?</Link>
             </div>
 
             <div className={styles.checkboxGroup}>

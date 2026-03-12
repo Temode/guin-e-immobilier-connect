@@ -4,6 +4,8 @@ import { AuthProvider } from './context/AuthContext';
 import OfflineBanner from './components/shared/OfflineBanner';
 import SocialAuthPage from "./components/pages/SocialAuthPage";
 import EmailAuthPage from "./components/pages/EmailAuthPage";
+import ForgotPassword from "./components/pages/ForgotPassword";
+import ResetPassword from "./components/pages/ResetPassword";
 import UserRoleSelection from "./components/pages/UserRoleSelection";
 import Home from "./components/pages/Home";
 import ProtectedRoute from './components/ProtectedRoute';
@@ -48,6 +50,8 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/auth" element={<SocialAuthPage />} />
             <Route path="/auth/email" element={<EmailAuthPage />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/user-role" element={<UserRoleSelection />} />
             <Route path="/property/:id" element={<PropertyDetail />} />
             
