@@ -4,6 +4,8 @@ import { AuthProvider } from './context/AuthContext';
 import OfflineBanner from './components/shared/OfflineBanner';
 import SocialAuthPage from "./components/pages/SocialAuthPage";
 import EmailAuthPage from "./components/pages/EmailAuthPage";
+import ForgotPassword from "./components/pages/ForgotPassword";
+import ResetPassword from "./components/pages/ResetPassword";
 import UserRoleSelection from "./components/pages/UserRoleSelection";
 import Home from "./components/pages/Home";
 import ProtectedRoute from './components/ProtectedRoute';
