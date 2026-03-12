@@ -2,6 +2,12 @@
 import { useState, useEffect } from 'react';
 import { getWithdrawalRequests, approveWithdrawal, rejectWithdrawal, type WithdrawalRequest } from '@/services/withdrawalService';
 import { formatAmount } from '@/services/paymentService';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  buildWithdrawalReceiptData,
+  downloadAgentReceipt,
+  downloadAdminReceipt,
+} from '@/services/withdrawalReceiptService';
 import styles from './shared/AdminLayout.module.css';
 
 /* ─── Icons ─── */
@@ -9,6 +15,7 @@ const CheckIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColo
 const XIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M18 6L6 18M6 6l12 12" /></svg>;
 const ClockIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>;
 const RefreshIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>;
+const DownloadIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>;
 
 const statusColors: Record<string, string> = {
   pending: '#F59E0B',
@@ -51,12 +58,35 @@ export default function AdminWithdrawals() {
   const completedCount = requests.filter(r => r.status === 'completed').length;
   const totalPending = requests.filter(r => r.status === 'pending').reduce((s, r) => s + r.amount, 0);
 
+  /** Fetch full transaction for receipt generation */
+  async function fetchTransactionForReceipt(transactionId: string) {
+    const { data } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('id', transactionId)
+      .single();
+    return data;
+  }
+
   async function handleApprove(id: string) {
     setProcessingId(id);
     const { error } = await approveWithdrawal(id);
     if (error) {
       alert('Erreur : ' + error.message);
+      setProcessingId(null);
+      setConfirmAction(null);
+      return;
     }
+
+    // Generate and download receipts
+    const tx = await fetchTransactionForReceipt(id);
+    if (tx) {
+      const receiptData = buildWithdrawalReceiptData(tx as any);
+      // Download both receipts
+      downloadAgentReceipt(receiptData);
+      setTimeout(() => downloadAdminReceipt(receiptData), 500);
+    }
+
     setProcessingId(null);
     setConfirmAction(null);
     await loadData();
@@ -67,10 +97,36 @@ export default function AdminWithdrawals() {
     const { error } = await rejectWithdrawal(id, 'Rejeté par l\'administrateur');
     if (error) {
       alert('Erreur : ' + error.message);
+      setProcessingId(null);
+      setConfirmAction(null);
+      return;
     }
+
+    // Generate rejection receipt for agent
+    const tx = await fetchTransactionForReceipt(id);
+    if (tx) {
+      const receiptData = buildWithdrawalReceiptData(tx as any);
+      downloadAgentReceipt(receiptData);
+    }
+
     setProcessingId(null);
     setConfirmAction(null);
     await loadData();
+  }
+
+  /** Download receipts for already processed transactions */
+  async function handleDownloadReceipts(req: WithdrawalRequest, type: 'agent' | 'admin') {
+    const tx = await fetchTransactionForReceipt(req.transaction_id);
+    if (!tx) {
+      alert('Transaction introuvable');
+      return;
+    }
+    const receiptData = buildWithdrawalReceiptData(tx as any);
+    if (type === 'agent') {
+      downloadAgentReceipt(receiptData);
+    } else {
+      downloadAdminReceipt(receiptData);
+    }
   }
 
   function formatDate(d: string) {
@@ -110,14 +166,9 @@ export default function AdminWithdrawals() {
       <div style={{ padding: '24px 32px' }}>
         {/* Stats Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20, marginBottom: 24 }}>
-          <div style={{
-            background: 'white', border: '1px solid #E2E8F0', borderRadius: 16, padding: 20,
-          }}>
+          <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 16, padding: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: 12, background: '#FEF3C7',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D97706',
-              }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D97706' }}>
                 <span style={{ width: 22, height: 22, display: 'inline-flex' }}><ClockIcon /></span>
               </div>
             </div>
@@ -125,14 +176,9 @@ export default function AdminWithdrawals() {
             <div style={{ fontSize: '0.813rem', color: '#64748B' }}>En attente</div>
           </div>
 
-          <div style={{
-            background: 'white', border: '1px solid #E2E8F0', borderRadius: 16, padding: 20,
-          }}>
+          <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 16, padding: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: 12, background: '#DCFCE7',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16A34A',
-              }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16A34A' }}>
                 <span style={{ width: 22, height: 22, display: 'inline-flex' }}><CheckIcon /></span>
               </div>
             </div>
@@ -140,9 +186,7 @@ export default function AdminWithdrawals() {
             <div style={{ fontSize: '0.813rem', color: '#64748B' }}>Traités</div>
           </div>
 
-          <div style={{
-            background: 'linear-gradient(135deg, #F59E0B, #D97706)', borderRadius: 16, padding: 20, color: 'white',
-          }}>
+          <div style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)', borderRadius: 16, padding: 20, color: 'white' }}>
             <div style={{ fontSize: '0.813rem', opacity: 0.9, marginBottom: 8 }}>Montant total en attente</div>
             <div style={{ fontFamily: 'Poppins, sans-serif', fontSize: '1.5rem', fontWeight: 700 }}>
               {formatAmount(totalPending)} GNF
@@ -181,17 +225,11 @@ export default function AdminWithdrawals() {
         </div>
 
         {/* Requests Table */}
-        <div style={{
-          background: 'white', border: '1px solid #E2E8F0', borderRadius: 16, overflow: 'hidden',
-        }}>
+        <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 16, overflow: 'hidden' }}>
           {loading ? (
-            <div style={{ padding: '60px 20px', textAlign: 'center', color: '#94A3B8' }}>
-              Chargement...
-            </div>
+            <div style={{ padding: '60px 20px', textAlign: 'center', color: '#94A3B8' }}>Chargement...</div>
           ) : filtered.length === 0 ? (
-            <div style={{ padding: '60px 20px', textAlign: 'center', color: '#94A3B8' }}>
-              Aucune demande de retrait
-            </div>
+            <div style={{ padding: '60px 20px', textAlign: 'center', color: '#94A3B8' }}>Aucune demande de retrait</div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
               <thead>
@@ -216,15 +254,11 @@ export default function AdminWithdrawals() {
                       <div style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 700, color: '#D97706' }}>
                         {formatAmount(req.amount)} {req.currency}
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
-                        Réf: {req.payment_reference}
-                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Réf: {req.payment_reference}</div>
                     </td>
                     <td style={{ padding: '16px 20px' }}>
                       <div style={{ fontWeight: 500, color: '#334155' }}>{req.destination}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
-                        {methodLabels[req.method] || req.method}
-                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#94A3B8' }}>{methodLabels[req.method] || req.method}</div>
                     </td>
                     <td style={{ padding: '16px 20px', color: '#64748B', fontSize: '0.813rem' }}>
                       {formatDate(req.created_at)}
@@ -329,9 +363,39 @@ export default function AdminWithdrawals() {
                           )}
                         </div>
                       ) : (
-                        <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>
-                          {req.processed_at ? formatDate(req.processed_at) : '—'}
-                        </span>
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => handleDownloadReceipts(req, 'agent')}
+                            title="Télécharger le reçu de l'agent"
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 4,
+                              padding: '5px 10px', borderRadius: 8,
+                              border: '1px solid #E2E8F0', background: 'white',
+                              color: '#047857', fontWeight: 500, fontSize: '0.7rem', cursor: 'pointer',
+                            }}
+                          >
+                            <span style={{ width: 12, height: 12, display: 'inline-flex' }}><DownloadIcon /></span>
+                            Reçu agent
+                          </button>
+                          {req.status === 'completed' && (
+                            <button
+                              onClick={() => handleDownloadReceipts(req, 'admin')}
+                              title="Télécharger la preuve de paiement admin"
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 4,
+                                padding: '5px 10px', borderRadius: 8,
+                                border: '1px solid #BFDBFE', background: '#EFF6FF',
+                                color: '#1D4ED8', fontWeight: 500, fontSize: '0.7rem', cursor: 'pointer',
+                              }}
+                            >
+                              <span style={{ width: 12, height: 12, display: 'inline-flex' }}><DownloadIcon /></span>
+                              Preuve admin
+                            </button>
+                          )}
+                          <div style={{ fontSize: '0.7rem', color: '#94A3B8', width: '100%', textAlign: 'center', marginTop: 2 }}>
+                            {req.processed_at ? formatDate(req.processed_at) : '—'}
+                          </div>
+                        </div>
                       )}
                     </td>
                   </tr>
