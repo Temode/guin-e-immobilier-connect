@@ -68,6 +68,32 @@ export default function AdminWithdrawals() {
     return data;
   }
 
+  /** Send receipt email to agent via Edge Function */
+  async function sendReceiptEmail(receiptData: ReturnType<typeof buildWithdrawalReceiptData>) {
+    try {
+      await supabase.functions.invoke('send-withdrawal-receipt', {
+        body: {
+          agentEmail: receiptData.agentEmail,
+          agentName: receiptData.agentName,
+          amount: receiptData.grossAmount,
+          platformFee: receiptData.platformFee,
+          netAmount: receiptData.netAmount,
+          currency: receiptData.currency,
+          method: receiptData.method,
+          destination: receiptData.destination,
+          reference: receiptData.paymentReference,
+          requestedAt: receiptData.requestedAt,
+          processedAt: receiptData.processedAt,
+          status: receiptData.status,
+          rejectionReason: receiptData.rejectionReason,
+        },
+      });
+      console.log('[AdminWithdrawals] Receipt email sent to', receiptData.agentEmail);
+    } catch (err) {
+      console.error('[AdminWithdrawals] Failed to send receipt email:', err);
+    }
+  }
+
   async function handleApprove(id: string) {
     setProcessingId(id);
     const { error } = await approveWithdrawal(id);
@@ -82,9 +108,10 @@ export default function AdminWithdrawals() {
     const tx = await fetchTransactionForReceipt(id);
     if (tx) {
       const receiptData = buildWithdrawalReceiptData(tx as any);
-      // Download both receipts
       downloadAgentReceipt(receiptData);
       setTimeout(() => downloadAdminReceipt(receiptData), 500);
+      // Send receipt email to agent automatically
+      sendReceiptEmail(receiptData);
     }
 
     setProcessingId(null);
@@ -107,6 +134,8 @@ export default function AdminWithdrawals() {
     if (tx) {
       const receiptData = buildWithdrawalReceiptData(tx as any);
       downloadAgentReceipt(receiptData);
+      // Send rejection email to agent automatically
+      sendReceiptEmail(receiptData);
     }
 
     setProcessingId(null);
